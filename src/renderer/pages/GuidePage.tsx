@@ -3,6 +3,7 @@ import { useGuideData, useEpgStats, triggerEpgRefresh, useEpgAutoInvalidate } fr
 import { useQueryClient } from '@tanstack/react-query';
 import { usePlayerStore } from '../stores/player-store';
 import type { EpgProgramme, EpgGuideChannel } from '../../shared/types/epg';
+import { useT } from '../i18n';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -38,6 +39,7 @@ function formatDate(ts: number): string {
 // ---------------------------------------------------------------------------
 
 export function GuidePage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const play = usePlayerStore((s) => s.play);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -93,7 +95,7 @@ export function GuidePage() {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">TV Guide</h2>
+          <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">{t('nav.guide')}</h2>
           {stats && (
             <p className="text-sm text-surface-500">
               {stats.programmeCount.toLocaleString()} programmes across{' '}
@@ -424,6 +426,7 @@ function ProgrammeDetail({
   onClose: () => void;
   onPlay: (streamUrl: string, title: string) => void;
 }) {
+  const t = useT();
   const duration = Math.round((programme.endTime - programme.startTime) / 60);
   const nowSecs = Math.floor(Date.now() / 1000);
   const isNow = programme.startTime <= nowSecs && programme.endTime > nowSecs;
@@ -589,7 +592,7 @@ function ProgrammeDetail({
             <>
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-sm font-medium text-green-400">Currently airing</span>
+                <span className="text-sm font-medium text-green-400">{t('guide.currentlyAiring')}</span>
               </div>
               <button
                 onClick={handlePlayLive}
@@ -598,7 +601,7 @@ function ProgrammeDetail({
                 <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
                 </svg>
-                Watch Live
+                {t('action.watchLive')}
               </button>
             </>
           )}
@@ -662,7 +665,7 @@ function ProgrammeDetail({
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
-                  Remind me when it starts
+                  {t('action.remindMe')}
                 </button>
               )}
             </>
@@ -692,6 +695,7 @@ function EmptyEpgState({
   onRefresh: () => void;
   isRefreshing: boolean;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-1 flex-col items-center justify-center">
       <svg
@@ -707,7 +711,7 @@ function EmptyEpgState({
           d="M6 2h12a2 2 0 012 2v16a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2zM8 6h8M8 10h8M8 14h4"
         />
       </svg>
-      <h3 className="mb-2 text-lg font-semibold text-surface-300">No EPG Data</h3>
+      <h3 className="mb-2 text-lg font-semibold text-surface-300">{t('guide.noData')}</h3>
       <p className="mb-4 max-w-sm text-center text-sm text-surface-500">
         Add an EPG URL to your source in Settings, or set a global EPG URL, then refresh.
       </p>

@@ -126,7 +126,7 @@ export function GeneralSettings() {
       <div>
         <h2 className="text-lg font-semibold text-surface-100">General</h2>
         <p className="mt-1 text-sm text-surface-500">
-          App appearance and startup behaviour
+          {t('settings.generalDesc')}
         </p>
       </div>
 
@@ -135,36 +135,36 @@ export function GeneralSettings() {
           Appearance
         </h3>
 
-        <SettingRow label="Theme" description="Application color theme">
+        <SettingRow label="Theme" description={t('settings.themeDesc')}>
           <Select
             value={get('ui_theme')}
             onChange={(v) => set('ui_theme', v)}
             options={[
-              { value: 'dark', label: 'Dark' },
-              { value: 'oled', label: 'OLED Black' },
-              { value: 'light', label: 'Light' },
+              { value: 'dark', label: t('theme.dark') },
+              { value: 'oled', label: t('theme.oled') },
+              { value: 'light', label: t('theme.light') },
             ]}
           />
         </SettingRow>
 
         <SettingRow
-          label="Default list style"
-          description="How channels and content are displayed"
+          label={t('settings.listStyle')}
+          description={t('settings.listStyleDesc')}
         >
           <Select
             value={get('ui_list_style')}
             onChange={(v) => set('ui_list_style', v)}
             options={[
-              { value: 'grid', label: 'Grid' },
-              { value: 'list', label: 'List' },
-              { value: 'compact', label: 'Compact List' },
+              { value: 'grid', label: t('listStyle.grid') },
+              { value: 'list', label: t('listStyle.list') },
+              { value: 'compact', label: t('listStyle.compact') },
             ]}
           />
         </SettingRow>
 
         <SettingRow
-          label="Show channel logos"
-          description="Display logos next to channel names"
+          label={t('settings.channelLogos')}
+          description={t('settings.channelLogosDesc')}
         >
           <Toggle
             checked={getBool('ui_channel_logos')}
@@ -203,18 +203,18 @@ export function GeneralSettings() {
             value={get('ui_start_page')}
             onChange={(v) => set('ui_start_page', v)}
             options={[
-              { value: 'live', label: 'Live TV' },
-              { value: 'movies', label: 'Movies' },
-              { value: 'series', label: 'Series' },
-              { value: 'guide', label: 'TV Guide' },
-              { value: 'favorites', label: 'Favorites' },
+              { value: 'live', label: t('nav.liveTv') },
+              { value: 'movies', label: t('nav.movies') },
+              { value: 'series', label: t('nav.series') },
+              { value: 'guide', label: t('nav.guide') },
+              { value: 'favorites', label: t('nav.favorites') },
             ]}
           />
         </SettingRow>
 
         <SettingRow
-          label="Remember last channel"
-          description="Resume the last watched channel on startup"
+          label={t('settings.rememberChannel')}
+          description={t('settings.rememberChannelDesc')}
         >
           <Toggle
             checked={getBool('ui_remember_last_channel')}
@@ -223,8 +223,8 @@ export function GeneralSettings() {
         </SettingRow>
 
         <SettingRow
-          label="Confirm on exit"
-          description="Show a confirmation dialog when closing the app"
+          label={t('settings.confirmExit')}
+          description={t('settings.confirmExitDesc')}
         >
           <Toggle
             checked={getBool('ui_confirm_on_exit')}
@@ -235,12 +235,12 @@ export function GeneralSettings() {
 
       <div className="space-y-2">
         <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
-          Desktop integration
+          {t('settings.desktopIntegration')}
         </h3>
 
         <SettingRow
-          label="Minimize to tray"
-          description="Minimize button hides the window to the system tray"
+          label={t('settings.minimizeToTray')}
+          description={t('settings.minimizeToTrayDesc')}
         >
           <Toggle
             checked={getBool('general_minimize_to_tray')}
@@ -249,8 +249,8 @@ export function GeneralSettings() {
         </SettingRow>
 
         <SettingRow
-          label="Close to tray"
-          description="Closing the window keeps the app running in the tray. Quit from the tray menu to fully exit."
+          label={t('settings.closeToTray')}
+          description={t('settings.closeToTrayDesc')}
         >
           <Toggle
             checked={getBool('general_close_to_tray')}
@@ -259,8 +259,8 @@ export function GeneralSettings() {
         </SettingRow>
 
         <SettingRow
-          label="Launch on startup"
-          description="Start YancoTV automatically when you sign in to Windows"
+          label={t('settings.launchOnStartup')}
+          description={t('settings.launchOnStartupDesc')}
         >
           <Toggle
             checked={launchOnStartup ?? false}
@@ -275,8 +275,8 @@ export function GeneralSettings() {
         </h3>
 
         <SettingRow
-          label="Show clock in sidebar"
-          description="Display the current time in the navigation sidebar"
+          label={t('settings.showClock')}
+          description={t('settings.showClockDesc')}
         >
           <Toggle
             checked={getBool('ui_show_clock')}
@@ -285,8 +285,8 @@ export function GeneralSettings() {
         </SettingRow>
 
         <SettingRow
-          label="Auto-tune on reminder"
-          description="When a programme reminder fires, switch to that channel automatically"
+          label={t('settings.autoTune')}
+          description={t('settings.autoTuneDesc')}
         >
           <Toggle
             checked={getBool('ui_reminder_auto_tune')}

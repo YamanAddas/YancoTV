@@ -162,6 +162,18 @@ describe('migrated surfaces stay migrated', () => {
   const MIGRATED = [
     'src/renderer/components/Sidebar.tsx',
     'src/renderer/components/PinModal.tsx',
+    'src/renderer/components/settings/GeneralSettings.tsx',
+    'src/renderer/pages/SettingsPage.tsx',
+    'src/renderer/pages/SearchPage.tsx',
+    'src/renderer/pages/HomePage.tsx',
+    'src/renderer/pages/LiveTvPage.tsx',
+    'src/renderer/pages/MoviesPage.tsx',
+    'src/renderer/pages/SeriesPage.tsx',
+    'src/renderer/pages/FavoritesPage.tsx',
+    'src/renderer/pages/RecordingsPage.tsx',
+    'src/renderer/pages/DownloadsPage.tsx',
+    'src/renderer/pages/ContentDetailPage.tsx',
+    'src/renderer/pages/GuidePage.tsx',
   ];
 
   // Deliberately narrow: JSX text nodes of two or more capitalised words, which

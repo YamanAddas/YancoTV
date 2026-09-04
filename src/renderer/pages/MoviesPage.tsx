@@ -7,11 +7,13 @@ import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
 import { SortDropdown, type SortOption } from '../components/SortDropdown';
 import { useFavoritesStore } from '../stores/favorites-store';
+import { useT } from '../i18n';
 
 const EMPTY_ITEMS: ContentCardData[] = [];
 const EMPTY_CATS: string[] = [];
 
 export function MoviesPage() {
+  const t = useT();
   const [selectedCategory, setSelectedCategory] = useState<string | string[] | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('provider');
@@ -88,8 +90,8 @@ export function MoviesPage() {
         </div>
         <EmptyState
           icon="film"
-          title="No movies"
-          message="Add an IPTV source in Settings to see movies."
+          title={t('empty.noMovies')}
+          message={t('empty.noMoviesHint')}
         />
       </div>
     );

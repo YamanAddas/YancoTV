@@ -9,8 +9,10 @@ import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useToastStore } from '../stores/toast-store';
 import type { ContentDetail, ContentItem, ContentMetadata, Episode } from '../../shared/types';
+import { useT } from '../i18n';
 
 export function ContentDetailPage() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -110,9 +112,11 @@ export function ContentDetailPage() {
     pushToast({
       kind: 'success',
       message: `Added to downloads: ${title}`,
-      action: { label: 'View', href: '/downloads' },
+      action: { label: t('action.view'), href: '/downloads' },
     });
-  }, [detail, pushToast]);
+    // `t` changes identity when the locale does; leaving it out would keep
+    // this toast in whatever language was active when the callback was made.
+  }, [detail, pushToast, t]);
 
   const handleEpisodeDownload = useCallback(
     async (episode: Episode) => {
@@ -143,10 +147,10 @@ export function ContentDetailPage() {
       pushToast({
         kind: 'success',
         message: `Added to downloads: ${label}`,
-        action: { label: 'View', href: '/downloads' },
+        action: { label: t('action.view'), href: '/downloads' },
       });
     },
-    [detail, pushToast],
+    [detail, pushToast, t],
   );
 
   const handleBack = useCallback(() => {
@@ -172,12 +176,12 @@ export function ContentDetailPage() {
   if (!detail) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
-        <p className="text-surface-400">Content not found</p>
+        <p className="text-surface-400">{t('detail.notFound')}</p>
         <button
           onClick={handleBack}
           className="rounded-lg bg-surface-800 px-4 py-2 text-sm text-surface-200 transition-colors hover:bg-surface-700"
         >
-          Go back
+          {t('action.goBack')}
         </button>
       </div>
     );
@@ -219,7 +223,7 @@ export function ContentDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25, delay: 0.1 }}
               >
-                <h2 className="mb-3 text-lg font-semibold text-surface-100">Episodes</h2>
+                <h2 className="mb-3 text-lg font-semibold text-surface-100">{t('detail.episodes')}</h2>
                 <EpisodesTab
                   episodes={episodes}
                   contentId={item.id}
@@ -232,7 +236,7 @@ export function ContentDetailPage() {
             {/* Episodes loading state for Xtream series */}
             {episodes.length === 0 && (
               <div className="rounded-xl border border-dashed border-surface-700 bg-surface-900/50 py-10 text-center">
-                <p className="text-sm text-surface-500">No episodes available</p>
+                <p className="text-sm text-surface-500">{t('detail.noEpisodes')}</p>
               </div>
             )}
 

@@ -5,8 +5,10 @@ import { EmptyState } from '../components/EmptyState';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import type { FavoriteEntry } from '../../shared/types';
+import { useT } from '../i18n';
 
 export function FavoritesPage() {
+  const t = useT();
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -74,11 +76,11 @@ export function FavoritesPage() {
   if (!isLoading && favorites.length === 0) {
     return (
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Favorites</h2>
+        <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">{t('nav.favorites')}</h2>
         <EmptyState
           icon="heart"
-          title="No favorites yet"
-          message="Browse your content and tap the heart to save favorites here."
+          title={t('empty.noFavorites')}
+          message={t('empty.noFavoritesHint')}
         />
       </div>
     );
@@ -87,7 +89,7 @@ export function FavoritesPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Favorites</h2>
+        <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">{t('nav.favorites')}</h2>
         <span className="text-sm text-surface-500">
           {items.length} item{items.length !== 1 ? 's' : ''}
         </span>

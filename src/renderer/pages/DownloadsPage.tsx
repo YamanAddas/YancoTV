@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from '../components/EmptyState';
 import { usePlayerStore } from '../stores/player-store';
 import type { Download, DownloadStatus } from '../../shared/types';
+import { useT } from '../i18n';
 
 function formatBytes(bytes?: number): string {
   if (!bytes || bytes <= 0) return '—';
@@ -46,6 +47,7 @@ const STATUS_COLOR: Record<DownloadStatus, string> = {
 };
 
 export function DownloadsPage() {
+  const t = useT();
   const qc = useQueryClient();
   const [liveProgress, setLiveProgress] = useState<
     Record<string, { bytesDownloaded: number; bytesTotal?: number; bytesPerSecond: number }>
@@ -131,20 +133,20 @@ export function DownloadsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Downloads</h2>
+        <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">{t('nav.downloads')}</h2>
         <button
           onClick={handleOpenFolder}
           className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-sm text-accent transition-colors hover:bg-accent/20"
         >
-          Open Folder
+          {t('action.openFolder')}
         </button>
       </div>
 
       {!isLoading && sorted.length === 0 ? (
         <EmptyState
           icon="film"
-          title="No downloads yet"
-          message="Open a movie or episode and click Download to add it here."
+          title={t('empty.noDownloads')}
+          message={t('empty.noDownloadsHint')}
         />
       ) : (
         <div className="space-y-2">
@@ -168,7 +170,7 @@ export function DownloadsPage() {
                         <button
                           onClick={() => handlePlay(dl)}
                           className="inline-flex min-w-0 items-center gap-2 text-left text-sm font-medium text-surface-100 hover:text-accent"
-                          title="Play download"
+                          title={t('media.playDownload')}
                         >
                           <svg
                             className="h-3.5 w-3.5 flex-shrink-0 text-accent/80"
@@ -270,14 +272,14 @@ export function DownloadsPage() {
                         <button
                           onClick={() => handleRemove(dl.id, false)}
                           className="rounded-md border border-surface-700/60 bg-surface-800/40 px-2.5 py-1 text-xs text-surface-300 hover:bg-surface-700/60"
-                          title="Remove from list (keep file)"
+                          title={t('media.removeKeepFile')}
                         >
                           Remove
                         </button>
                         <button
                           onClick={() => handleRemove(dl.id, true)}
                           className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-xs text-rose-300 hover:bg-rose-500/20"
-                          title="Delete file and remove from list"
+                          title={t('media.deleteFile')}
                         >
                           Delete
                         </button>

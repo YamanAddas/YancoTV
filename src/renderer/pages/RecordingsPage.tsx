@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from '../components/EmptyState';
 import { usePlayerStore } from '../stores/player-store';
 import type { Recording } from '../../shared/types/recording';
+import { useT } from '../i18n';
 
 function formatDuration(seconds?: number): string {
   if (!seconds || seconds < 0) return '—';
@@ -38,6 +39,7 @@ const STATUS_COLOR: Record<Recording['status'], string> = {
 };
 
 export function RecordingsPage() {
+  const t = useT();
   const qc = useQueryClient();
   const [livePairs, setLivePairs] = useState<
     Record<string, { durationSeconds: number; fileSizeBytes: number }>
@@ -109,12 +111,12 @@ export function RecordingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Recordings</h2>
+        <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">{t('nav.recordings')}</h2>
         <button
           onClick={handleOpenFolder}
           className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-sm text-accent transition-colors hover:bg-accent/20"
         >
-          Open Folder
+          {t('action.openFolder')}
         </button>
       </div>
 
@@ -129,8 +131,8 @@ export function RecordingsPage() {
       {!isLoading && sorted.length === 0 ? (
         <EmptyState
           icon="film"
-          title="No recordings yet"
-          message="Right-click a live channel and choose Record to start recording."
+          title={t('empty.noRecordings')}
+          message={t('empty.noRecordingsHint')}
         />
       ) : (
         <div className="overflow-hidden rounded-xl border border-surface-700/40 bg-surface-800/30">
@@ -140,7 +142,7 @@ export function RecordingsPage() {
                 <th className="px-4 py-3">Title</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Started</th>
-                <th className="px-4 py-3">Duration</th>
+                <th className="px-4 py-3">{t('media.duration')}</th>
                 <th className="px-4 py-3">Size</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -164,7 +166,7 @@ export function RecordingsPage() {
                         <button
                           onClick={() => handlePlay(r)}
                           className="inline-flex items-center gap-2 text-left hover:text-accent"
-                          title="Play recording"
+                          title={t('media.playRecording')}
                         >
                           <svg
                             className="h-3.5 w-3.5 flex-shrink-0 text-accent/80"
@@ -211,14 +213,14 @@ export function RecordingsPage() {
                           <button
                             onClick={() => handleDelete(r.id, false)}
                             className="rounded-md border border-surface-700/60 bg-surface-800/40 px-2.5 py-1 text-xs text-surface-300 hover:bg-surface-700/60"
-                            title="Remove from list (keep file)"
+                            title={t('media.removeKeepFile')}
                           >
                             Remove
                           </button>
                           <button
                             onClick={() => handleDelete(r.id, true)}
                             className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-xs text-rose-300 hover:bg-rose-500/20"
-                            title="Delete file and remove from list"
+                            title={t('media.deleteFile')}
                           >
                             Delete
                           </button>

@@ -12,11 +12,13 @@ import { useSettingsStore } from '../stores/settings-store';
 import { useRecentChannelsStore } from '../stores/recent-channels-store';
 import { useToastStore } from '../stores/toast-store';
 import { useNowNextBatch } from '../hooks/use-epg';
+import { useT } from '../i18n';
 
 const EMPTY_ITEMS: ContentCardData[] = [];
 const EMPTY_CATS: string[] = [];
 
 export function LiveTvPage() {
+  const t = useT();
   const [selectedCategory, setSelectedCategory] = useState<string | string[] | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('provider');
@@ -218,13 +220,13 @@ export function LiveTvPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-serif text-4xl italic tracking-tight text-surface-100">Live TV</h2>
+          <h2 className="font-serif text-4xl italic tracking-tight text-surface-100">{t('nav.liveTv')}</h2>
           <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />
         </div>
         <EmptyState
           icon="tv"
-          title="No live channels"
-          message="Add an IPTV source in Settings to see live channels."
+          title={t('empty.noLiveChannels')}
+          message={t('empty.noLiveHint')}
         />
       </div>
     );
@@ -234,7 +236,7 @@ export function LiveTvPage() {
     <div className="flex h-full flex-col">
       <div className="mb-4 flex items-baseline justify-between">
         <div className="flex items-baseline gap-3">
-          <h2 className="font-serif text-4xl italic tracking-tight text-surface-100">Live TV</h2>
+          <h2 className="font-serif text-4xl italic tracking-tight text-surface-100">{t('nav.liveTv')}</h2>
           <span className="font-mono text-[11px] uppercase tracking-widest-plus text-surface-500 tabular-nums">
             {filtered.length.toLocaleString()} channels
           </span>
@@ -292,7 +294,7 @@ export function LiveTvPage() {
         <div className="mb-4">
           <div className="mb-2 flex items-center gap-2">
             <h3 className="font-display text-[11px] uppercase tracking-widest-plus text-surface-400">
-              Recently watched
+              {t('home.recentlyWatchedLower')}
             </h3>
             <span className="rounded-full bg-surface-800/60 px-2 py-0.5 font-mono text-[10px] tabular-nums text-surface-500">
               {recentChannels.length}

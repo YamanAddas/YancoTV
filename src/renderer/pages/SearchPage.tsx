@@ -10,6 +10,8 @@ import {
   removeFromHistory,
   clearSearchHistory,
 } from '../utils/search-history';
+import { useT } from '../i18n';
+import type { StringKey } from '../i18n/locales/en';
 
 function toCardData(item: ContentItem): ContentCardData {
   return {
@@ -35,11 +37,14 @@ const FILTER_ICON: Record<TypeFilter, string> = {
   series: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10',
 };
 
-const FILTER_OPTIONS: { value: TypeFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'live', label: 'Live' },
-  { value: 'movie', label: 'Movies' },
-  { value: 'series', label: 'Series' },
+// Keys, not labels: this constant is evaluated once at import, so a resolved
+// string would freeze the language active at load. Same reason the sidebar's
+// nav items and the settings category list carry keys.
+const FILTER_OPTIONS: { value: TypeFilter; labelKey: StringKey }[] = [
+  { value: 'all', labelKey: 'search.filterAll' },
+  { value: 'live', labelKey: 'search.filterLive' },
+  { value: 'movie', labelKey: 'nav.movies' },
+  { value: 'series', labelKey: 'nav.series' },
 ];
 
 function parseTypeFilter(value: string | null): TypeFilter {
@@ -48,6 +53,7 @@ function parseTypeFilter(value: string | null): TypeFilter {
 }
 
 export function SearchPage() {
+  const t = useT();
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>(parseTypeFilter(searchParams.get('type')));
@@ -197,14 +203,14 @@ export function SearchPage() {
           <SearchIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-surface-500" />
           <input
             type="search"
-            placeholder="Search channels, movies, series..."
+            placeholder={t('nav.searchPlaceholder')}
             value={query}
             onChange={handleQueryChange}
             autoFocus
             className="w-full rounded-xl border border-accent/5 bg-surface-800 py-3 pl-10 pr-4 text-surface-100 placeholder-surface-500 outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
           />
         </div>
-        <div className="mt-3 flex flex-wrap gap-2" role="tablist" aria-label="Filter by content type">
+        <div className="mt-3 flex flex-wrap gap-2" role="tablist" aria-label={t('search.filterByType')}>
           {FILTER_OPTIONS.map((opt) => {
             const selected = typeFilter === opt.value;
             return (
@@ -233,7 +239,7 @@ export function SearchPage() {
                     d={FILTER_ICON[opt.value]}
                   />
                 </svg>
-                {opt.label}
+                {t(opt.labelKey)}
               </button>
             );
           })}
@@ -253,7 +259,7 @@ export function SearchPage() {
       {!query.trim() && !isLoading && history.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-surface-500">
           <SearchIcon className="mb-4 h-12 w-12 opacity-30" />
-          <p className="text-sm">Type to search your content library</p>
+          <p className="text-sm">{t('search.prompt')}</p>
         </div>
       )}
 
@@ -261,13 +267,13 @@ export function SearchPage() {
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold uppercase tracking-wider text-surface-400">
-              Recent searches
+              {t('search.recentSearches')}
             </h3>
             <button
               onClick={handleClearHistory}
               className="text-xs text-surface-500 transition-colors hover:text-surface-300"
             >
-              Clear all
+              {t('action.clearAll')}
             </button>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -308,7 +314,7 @@ export function SearchPage() {
 
       {!isLoading && (typeFilter === 'all' || typeFilter === 'live') && live.length > 0 && (
         <section>
-          <ZoneHeader kind="live" label="Live TV" total={allLive.length} cap={ZONE_DISPLAY_CAP} />
+          <ZoneHeader kind="live" label={t('nav.liveTv')} total={allLive.length} cap={ZONE_DISPLAY_CAP} />
           <HorizontalContentRow
             items={live}
             onItemClick={handleItemClick}

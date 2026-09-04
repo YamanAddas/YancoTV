@@ -7,11 +7,13 @@ import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
 import { SortDropdown, type SortOption } from '../components/SortDropdown';
 import { useFavoritesStore } from '../stores/favorites-store';
+import { useT } from '../i18n';
 
 const EMPTY_ITEMS: ContentCardData[] = [];
 const EMPTY_CATS: string[] = [];
 
 export function SeriesPage() {
+  const t = useT();
   const [selectedCategory, setSelectedCategory] = useState<string | string[] | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('provider');
@@ -87,8 +89,8 @@ export function SeriesPage() {
         </div>
         <EmptyState
           icon="layers"
-          title="No series"
-          message="Add an IPTV source in Settings to see series."
+          title={t('empty.noSeries')}
+          message={t('empty.noSeriesHint')}
         />
       </div>
     );

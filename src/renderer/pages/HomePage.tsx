@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import type { FavoriteEntry, HistoryEntry } from '../../shared/types';
+import { useT } from '../i18n';
 
 interface ContentCounts {
   live: number;
@@ -11,6 +12,7 @@ interface ContentCounts {
 }
 
 export function HomePage() {
+  const t = useT();
   const [counts, setCounts] = useState<ContentCounts>({ live: 0, movie: 0, series: 0 });
   const [recentlyWatched, setRecentlyWatched] = useState<HistoryEntry[]>([]);
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
@@ -88,9 +90,9 @@ export function HomePage() {
       <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Home</h2>
 
       <div className="grid grid-cols-3 gap-4">
-        <StatusCard title="Live TV" count={counts.live} icon="tv" onClick={() => navigate('/live')} />
-        <StatusCard title="Movies" count={counts.movie} icon="film" onClick={() => navigate('/movies')} />
-        <StatusCard title="Series" count={counts.series} icon="layers" onClick={() => navigate('/series')} />
+        <StatusCard title={t('nav.liveTv')} count={counts.live} icon="tv" onClick={() => navigate('/live')} />
+        <StatusCard title={t('nav.movies')} count={counts.movie} icon="film" onClick={() => navigate('/movies')} />
+        <StatusCard title={t('nav.series')} count={counts.series} icon="layers" onClick={() => navigate('/series')} />
       </div>
 
       {total === 0 && (
@@ -104,7 +106,7 @@ export function HomePage() {
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
-          <h3 className="mt-4 text-sm font-medium text-surface-300">No content yet</h3>
+          <h3 className="mt-4 text-sm font-medium text-surface-300">{t('empty.noContent')}</h3>
           <p className="mt-1 text-sm text-surface-500">
             Add an IPTV source in Settings to get started.
           </p>
@@ -112,7 +114,7 @@ export function HomePage() {
             onClick={() => navigate('/settings')}
             className="mt-4 rounded-lg bg-accent/10 px-4 py-2 text-sm font-medium text-accent shadow-glow-sm transition-colors hover:bg-accent/20"
           >
-            Go to Settings
+            {t('action.goToSettings')}
           </button>
         </div>
       )}
@@ -121,11 +123,11 @@ export function HomePage() {
         <>
           <section>
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-surface-200">Recently Watched</h3>
+              <h3 className="text-lg font-semibold text-surface-200">{t('home.recentlyWatched')}</h3>
             </div>
             {recentlyWatched.length === 0 ? (
               <div className="flex items-center justify-center rounded-xl border border-dashed border-surface-700 bg-surface-900/50 py-10">
-                <p className="text-sm text-surface-500">Nothing watched yet. Start browsing!</p>
+                <p className="text-sm text-surface-500">{t('empty.nothingWatched')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -138,13 +140,13 @@ export function HomePage() {
 
           <section>
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-surface-200">Favorites</h3>
+              <h3 className="text-lg font-semibold text-surface-200">{t('nav.favorites')}</h3>
               {favorites.length > 0 && (
                 <button
                   onClick={() => navigate('/favorites')}
                   className="text-sm text-accent hover:underline"
                 >
-                  See all
+                  {t('action.seeAll')}
                 </button>
               )}
             </div>
