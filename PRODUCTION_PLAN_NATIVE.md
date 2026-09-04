@@ -3829,7 +3829,7 @@ coordinates; BACK handing focus to the sidebar so DOWN counted sidebar movement)
 results, one real bug — **on a TV the question is not "does the content scroll" but "can focus get
 there"**, and only a D-pad walk answers it.
 
-### MK.38 — live TV gets the same dock as film and episode — code complete, device verification blocked
+### MK.38 — live TV gets the same dock as film and episode — slice 1 shipped and device-verified
 
 Reported by the owner: "البلاير تبع لايف تي في عالاندرويد تي في مالو نفس البلاير تبع الأفلام
 والمسلسلات" — the live player is not the same player as the one for films and series.
@@ -3875,17 +3875,34 @@ by `NEXT` alone — anything else moving means the docks have drifted apart agai
 `assembleRelease` builds, installs on the Fire TV, app launches with 0 fatals and the sidebar at its
 usual `[40,160][160,264]`.
 
-**NOT verified, and this is the part that matters.** The dock has not been seen on a live channel on
-a device. Two independent reasons: the **Fire TV has no source configured at all** ("No sources yet"
-in Settings → Sources), and the **phone's debug seed points at a free list whose streams return
-404**, so the player opens into an error state and never reaches a playing item. Adding the owner's
-provider is not something to do on their behalf.
+**Device pass — Google TV, the owner's own catalogue, 2026-09-04.** The Fire TV has no source
+configured and the phone's debug seed points at streams that 404, so neither could reach a playing
+live item. The Google TV has the owner's real list; the pass ran there, on a release build.
 
-What the device pass still has to answer, none of which a unit test can:
-  - the dock actually appears on CENTER over a live channel, and Media3's controller does not
-  - the zap bar and the OSD still appear, now riding with the dock
-  - D-pad focus lands somewhere sensible, and the cascade smoke test still passes
+It failed the first time, and the reason was not in anything the commit changed. **Two further sites
+branched on `ContentType.LIVE`** and sent live to `playerView.showController()` — the CENTER key-UP
+short press, and the `KEYCODE_DPAD_CENTER, KEYCODE_ENTER` case in `onKeyDown`. Once `useController`
+went false for live, both became silent no-ops: pressing OK on a channel did nothing at all. The
+sweep that found the other five sites grepped `controllerVisible`, which neither of these mentions —
+they decide on content type instead. Fixed in `f11286e3`.
+
+Then confirmed on screen, on `V SPORT ᵁᴴᴰ ³⁸⁴⁰ᴾ`: the dock renders with the green transport cluster
+(ours, not Media3's), `NEXT` is absent while -10/+10 are present, and the programme row carries
+now-title, `Up next`, the progress track and `57 min left • 185 min`.
+
+**A method note worth keeping.** Two of my `uiautomator` dumps read `com.google.android.apps.tv.launcherx`
+and I read them as "the dock did not appear" — the device had returned to the home screen and I was
+pressing CENTER at the launcher. A negative device result is worth nothing until the dump's `package`
+attribute says the app is on screen. The owner's photograph is what settled it.
+
+Still to check on a device (not blocking slice 1, but not done):
+  - the zap bar and the OSD, now riding with the dock rather than with Media3's controller
+  - D-pad focus order across the dock on a channel, and that it cannot escape the dock
   - zapping VOD → live → VOD swaps the surface cleanly
+
+**Slice 2 — the More button.** Not started. The owner's refinement: iOS hides controls because the
+bar cannot fit them, and the fix is a More button that surfaces the overflow instead of dropping it.
+The `⋯` on screen today is the existing MENU control, not this. iOS follows whatever lands here.
 
 ### Remaining slices
 
