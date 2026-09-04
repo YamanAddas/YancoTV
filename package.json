@@ -88,21 +88,8 @@
     "vitest": "^3.0.5",
     "wait-on": "^9.0.10"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "electron",
-      "esbuild",
-      "ffmpeg-static"
-    ],
-    "overrides": {
-      "fast-uri": "^3.1.2",
-      "@xmldom/xmldom": "^0.9.10",
-      "ip-address": "^10.2.0",
-      "postcss": "^8.5.14"
-    }
-  },
   "engines": {
     "node": ">=22.0.0"
-  }
+  },
+  "packageManager": "pnpm@11.25.0"
 }

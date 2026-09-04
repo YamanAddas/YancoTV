@@ -3,7 +3,14 @@
 
 $ErrorActionPreference = "Stop"
 
-$mpvDir = Join-Path $PSScriptRoot ".." "mpv"
+# Windows PowerShell 5.1 -- the version that ships with Windows and the one
+# `pnpm postinstall` actually invokes -- takes only -Path and -ChildPath.
+# The three-argument form needs PowerShell 7+, so this line threw
+# "A positional parameter cannot be found that accepts argument 'mpv'",
+# postinstall reported "mpv download failed", and the tree ended up with no
+# mpv binary at all -- which electron-builder.yml then tries to ship as
+# extraResources. Nested two-argument calls work on both.
+$mpvDir = Join-Path (Join-Path $PSScriptRoot "..") "mpv"
 $mpvExe = Join-Path $mpvDir "mpv.exe"
 
 if (Test-Path $mpvExe) {

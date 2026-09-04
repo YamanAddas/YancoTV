@@ -5,3 +5,43 @@ packages:
   # land in pnpm-lock.yaml. Directory + its CLAUDE.md stay on disk as a
   # historical reference only.
   - '!packages/mobile'
+
+# ── moved here from package.json's "pnpm" field, 2026-09-04 ──
+# pnpm 10 stopped reading `pnpm.overrides` / `pnpm.onlyBuiltDependencies` from
+# package.json and warns that it "no longer read[s]" them. With pnpm 11 that was
+# not a warning in practice, it was a hard install failure: the lockfile still
+# recorded these four overrides while the manifest appeared to declare none, and
+# `.npmrc` sets frozen-lockfile=true, so every install aborted as out-of-date.
+# `node_modules/` had not existed in this tree since.
+#
+# onlyBuiltDependencies matters just as much. pnpm 10+ blocks dependency build
+# scripts by default, so being ignored here meant better-sqlite3's native binding
+# was never compiled and Electron's binary was never downloaded — the app could
+# not have opened its database even if resolution had succeeded.
+
+overrides:
+  fast-uri: ^3.1.2
+  '@xmldom/xmldom': ^0.9.10
+  ip-address: ^10.2.0
+  postcss: ^8.5.14
+
+# pnpm 11 replaced `onlyBuiltDependencies` with `allowBuilds`, and rewrote this
+# file itself to add the stub below on first install. Every entry must be an
+# explicit true/false — pnpm refuses to install while any is undecided.
+#
+# All six are first-party build tooling for this app, not incidental transitive
+# packages, so all six are allowed:
+#   better-sqlite3      compiles the native binding the whole DB layer sits on
+#   electron            downloads the Electron binary; without it there is no app
+#   esbuild             bundles the main process
+#   ffmpeg-static       fetches the ffmpeg binary recording + subtitle extraction shell out to
+#   electron-winstaller only used by `pnpm package`; denying it breaks releases, not dev
+#   sharp               icon rasterisation pulled in by the packager, same scope
+
+allowBuilds:
+  better-sqlite3: true
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  ffmpeg-static: true
+  sharp: true
