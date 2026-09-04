@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
+import { useT } from '../../i18n';
 
 // ---------------------------------------------------------------------------
 // Network Settings — proxy, user-agent, timeout, connection preferences
@@ -54,6 +55,7 @@ function Toggle({
 }
 
 export function NetworkSettings() {
+  const t = useT();
   const { get, getBool, set, setBool, load, loaded } = useSettingsStore();
 
   useEffect(() => {
@@ -75,7 +77,7 @@ export function NetworkSettings() {
       <div>
         <h2 className="text-lg font-semibold text-surface-100">Network</h2>
         <p className="mt-1 text-sm text-surface-500">
-          Connection and proxy settings for streaming
+          {t('network.desc')}
         </p>
       </div>
 
@@ -87,7 +89,7 @@ export function NetworkSettings() {
               Proxy
             </h3>
             <p className="mt-1 text-xs text-surface-500">
-              Route stream traffic through a proxy server
+              {t('network.proxyDesc')}
             </p>
           </div>
           <Toggle
@@ -100,7 +102,7 @@ export function NetworkSettings() {
           <div className="space-y-3 border-t border-accent/5 pt-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-surface-300">
-                Proxy type
+                {t('network.proxyType')}
               </label>
               <select
                 value={get('network_proxy_type')}
@@ -152,8 +154,8 @@ export function NetworkSettings() {
         </h3>
         <div className="space-y-2">
           <SettingRow
-            label="Stream buffer"
-            description="Low = less latency on live sports. High = more stability on slow connections"
+            label={t('network.streamBuffer')}
+            description={t('network.streamBufferDesc')}
           >
             <select
               value={get('playback_buffer_size')}
@@ -161,15 +163,15 @@ export function NetworkSettings() {
               className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
             >
               <option value="auto">Auto</option>
-              <option value="low">Low (live sports)</option>
+              <option value="low">{t('network.bufferLow')}</option>
               <option value="medium">Medium</option>
-              <option value="high">High (slow connections)</option>
+              <option value="high">{t('network.bufferHigh')}</option>
             </select>
           </SettingRow>
 
           <SettingRow
-            label="Connection timeout"
-            description="Seconds to wait before a stream connection is considered failed"
+            label={t('network.timeout')}
+            description={t('network.timeoutDesc')}
           >
             <select
               value={get('network_connection_timeout')}
@@ -186,15 +188,15 @@ export function NetworkSettings() {
           </SettingRow>
 
           <SettingRow
-            label="Retry attempts"
-            description="Number of times to retry a failed stream connection"
+            label={t('network.retries')}
+            description={t('network.retriesDesc')}
           >
             <select
               value={get('network_retry_attempts')}
               onChange={(e) => set('network_retry_attempts', e.target.value)}
               className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
             >
-              <option value="0">No retry</option>
+              <option value="0">{t('network.noRetry')}</option>
               <option value="1">1 attempt</option>
               <option value="2">2 attempts</option>
               <option value="3">3 attempts</option>
@@ -203,8 +205,8 @@ export function NetworkSettings() {
           </SettingRow>
 
           <SettingRow
-            label="Prefer IPv4"
-            description="Force IPv4 connections (helps with some providers)"
+            label={t('network.preferIpv4')}
+            description={t('network.preferIpv4Desc')}
           >
             <Toggle
               checked={getBool('network_prefer_ipv4')}

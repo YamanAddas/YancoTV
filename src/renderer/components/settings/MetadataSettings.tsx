@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
+import { useT } from '../../i18n';
+import type { StringKey } from '../../i18n/locales/en';
 
 // ---------------------------------------------------------------------------
 // Metadata Settings — TMDb API key, language, cache controls
@@ -9,22 +11,25 @@ import { useSettingsStore } from '../../stores/settings-store';
 // the main process whether a key is configured, and sends new keys via IPC.
 // ---------------------------------------------------------------------------
 
+// Keys, not resolved labels: a module-level constant is evaluated once at
+// import, so a resolved string would freeze the language active at load.
 const LANGUAGE_OPTIONS = [
-  { value: 'en-US', label: 'English (US)' },
-  { value: 'en-GB', label: 'English (UK)' },
-  { value: 'es-ES', label: 'Spanish' },
-  { value: 'fr-FR', label: 'French' },
-  { value: 'de-DE', label: 'German' },
-  { value: 'it-IT', label: 'Italian' },
-  { value: 'pt-BR', label: 'Portuguese (Brazil)' },
-  { value: 'ar-SA', label: 'Arabic' },
-  { value: 'ja-JP', label: 'Japanese' },
-  { value: 'ko-KR', label: 'Korean' },
-  { value: 'tr-TR', label: 'Turkish' },
-  { value: 'ru-RU', label: 'Russian' },
+  { value: 'en-US', labelKey: 'lang.englishUs' as StringKey },
+  { value: 'en-GB', labelKey: 'lang.englishUk' as StringKey },
+  { value: 'es-ES', labelKey: 'lang.spanish' as StringKey },
+  { value: 'fr-FR', labelKey: 'lang.french' as StringKey },
+  { value: 'de-DE', labelKey: 'lang.german' as StringKey },
+  { value: 'it-IT', labelKey: 'lang.italian' as StringKey },
+  { value: 'pt-BR', labelKey: 'lang.portugueseBr' as StringKey },
+  { value: 'ar-SA', labelKey: 'lang.arabic' as StringKey },
+  { value: 'ja-JP', labelKey: 'lang.japanese' as StringKey },
+  { value: 'ko-KR', labelKey: 'lang.korean' as StringKey },
+  { value: 'tr-TR', labelKey: 'lang.turkish' as StringKey },
+  { value: 'ru-RU', labelKey: 'lang.russian' as StringKey },
 ];
 
 export function MetadataSettings() {
+  const t = useT();
   const { getBool, get, setBool, set, load, loaded } = useSettingsStore();
 
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
@@ -103,7 +108,7 @@ export function MetadataSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-surface-100">Metadata</h2>
+        <h2 className="text-lg font-semibold text-surface-100">{t('settingsTab.metadata')}</h2>
         <p className="mt-1 text-sm text-surface-500">
           Enrich movies and series with posters, plots, cast, and ratings from TMDb.
         </p>
@@ -113,7 +118,7 @@ export function MetadataSettings() {
       <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-surface-200">Enable TMDb enrichment</p>
+            <p className="text-sm font-medium text-surface-200">{t('metadata.enableTmdb')}</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Requires a free API key from themoviedb.org
             </p>
@@ -185,7 +190,7 @@ export function MetadataSettings() {
                 onClick={handleClearKey}
                 className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20"
               >
-                Clear saved key
+                {t('metadata.clearKey')}
               </button>
             )}
           </div>
@@ -210,7 +215,7 @@ export function MetadataSettings() {
 
         <div className="flex items-center justify-between gap-4 rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
           <div>
-            <p className="text-sm font-medium text-surface-200">Language</p>
+            <p className="text-sm font-medium text-surface-200">{t('settings.language')}</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Plot, titles, and tagline translations
             </p>
@@ -222,7 +227,7 @@ export function MetadataSettings() {
           >
             {LANGUAGE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
-                {opt.label}
+                {t(opt.labelKey)}
               </option>
             ))}
           </select>
@@ -237,7 +242,7 @@ export function MetadataSettings() {
 
         <div className="flex items-center justify-between gap-4 rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
           <div>
-            <p className="text-sm font-medium text-surface-200">Clear cached lookups</p>
+            <p className="text-sm font-medium text-surface-200">{t('metadata.clearCache')}</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Forces YancoTV to re-fetch metadata next time a detail page opens.
             </p>
@@ -246,7 +251,7 @@ export function MetadataSettings() {
             onClick={handleClearCache}
             className="rounded-lg border border-surface-700 bg-surface-800/40 px-3 py-1.5 text-sm font-medium text-surface-300 transition-colors hover:border-accent/40 hover:text-accent"
           >
-            Clear cache
+            {t('metadata.clearCacheShort')}
           </button>
         </div>
       </div>

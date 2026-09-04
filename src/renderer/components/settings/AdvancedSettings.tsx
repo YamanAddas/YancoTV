@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
+import { useT } from '../../i18n';
 import {
   PageHeading,
   SectionHeading,
@@ -24,6 +25,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function AdvancedSettings() {
+  const t = useT();
   const { get, getBool, set, setBool, load, loaded } = useSettingsStore();
   const [paths, setPaths] = useState<{ userData: string; logs: string } | null>(null);
   const [backupStatus, setBackupStatus] = useState<
@@ -153,16 +155,16 @@ export function AdvancedSettings() {
   return (
     <div className="space-y-6">
       <PageHeading
-        title="Advanced"
+        title={t('settingsTab.advanced')}
         subtitle="Power-user settings. Leave defaults unless you know why you're changing them."
       />
 
       <div className="space-y-2">
-        <SectionHeading>Playback engine</SectionHeading>
+        <SectionHeading>{t('advanced.playbackEngine')}</SectionHeading>
 
         <SettingRow
-          label="Hardware acceleration"
-          description="Use GPU for video decoding. Disable only if you see rendering glitches."
+          label={t('advanced.hwAccel')}
+          description={t('advanced.hwAccelDesc')}
         >
           <Toggle
             checked={getBool('playback_hw_accel')}
@@ -172,7 +174,7 @@ export function AdvancedSettings() {
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
           <div>
-            <p className="text-sm font-medium text-surface-200">Custom mpv path</p>
+            <p className="text-sm font-medium text-surface-200">{t('advanced.customMpvPath')}</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Override the bundled mpv with a specific build. Leave blank to
               use the bundled version or auto-discover mpv on your PATH.
@@ -197,7 +199,7 @@ export function AdvancedSettings() {
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
           <div>
-            <p className="text-sm font-medium text-surface-200">Export backup</p>
+            <p className="text-sm font-medium text-surface-200">{t('advanced.exportBackup')}</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Save your sources, favorites, watch history, settings, parental
               rules, and group preferences to a single JSON file. Credentials
@@ -246,7 +248,7 @@ export function AdvancedSettings() {
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
           <div>
-            <p className="text-sm font-medium text-surface-200">Restore backup</p>
+            <p className="text-sm font-medium text-surface-200">{t('advanced.restoreBackup')}</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Load a previously exported backup. Favorites and history are
               re-linked to your current sources by stream URL — any that can&apos;t
@@ -311,11 +313,11 @@ export function AdvancedSettings() {
       </div>
 
       <div className="space-y-2">
-        <SectionHeading>Diagnostics</SectionHeading>
+        <SectionHeading>{t('advanced.diagnostics')}</SectionHeading>
 
         <SettingRow
-          label="Debug logging"
-          description="Write verbose logs to disk. Useful when reporting bugs."
+          label={t('advanced.debugLogging')}
+          description={t('advanced.debugLoggingDesc')}
         >
           <Toggle
             checked={getBool('advanced_debug_logging')}
@@ -325,7 +327,7 @@ export function AdvancedSettings() {
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
           <div>
-            <p className="text-sm font-medium text-surface-200">Export log file</p>
+            <p className="text-sm font-medium text-surface-200">{t('advanced.exportLog')}</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Save a snapshot of the current log for bug reports. The live log
               keeps running — this is just a copy.
@@ -348,7 +350,7 @@ export function AdvancedSettings() {
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
           <div>
-            <p className="text-sm font-medium text-surface-200">Data directory</p>
+            <p className="text-sm font-medium text-surface-200">{t('advanced.dataDirectory')}</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Settings, database, and cached files live here. Handy for
               backups or log export.

@@ -49,6 +49,10 @@ const MIGRATED = new Set(
     'src/renderer/components/settings/EpgSettings.tsx',
     'src/renderer/components/settings/SubtitlesSettings.tsx',
     'src/renderer/components/settings/PlaybackSettings.tsx',
+    'src/renderer/components/settings/DownloadsSettings.tsx',
+    'src/renderer/components/settings/MetadataSettings.tsx',
+    'src/renderer/components/settings/NetworkSettings.tsx',
+    'src/renderer/components/settings/AdvancedSettings.tsx',
   ].map((p) => p.split('/').join(path.sep)),
 );
 

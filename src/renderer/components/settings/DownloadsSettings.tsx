@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
+import { useT } from '../../i18n';
 import {
   PageHeading,
   SectionHeading,
@@ -15,6 +16,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export function DownloadsSettings() {
+  const t = useT();
   const { get, getBool, set, setBool, load, loaded } = useSettingsStore();
   const [resolvedPath, setResolvedPath] = useState<string>('');
 
@@ -55,8 +57,8 @@ export function DownloadsSettings() {
   return (
     <div className="space-y-6">
       <PageHeading
-        title="Downloads"
-        subtitle="Where VOD downloads are saved and how they behave"
+        title={t('nav.downloads')}
+        subtitle={t('downloads.desc')}
       />
 
       <div className="space-y-2">
@@ -64,7 +66,7 @@ export function DownloadsSettings() {
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
           <div>
-            <p className="text-sm font-medium text-surface-200">Save location</p>
+            <p className="text-sm font-medium text-surface-200">{t('downloads.saveLocation')}</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Movies and episodes are saved into this folder alongside their
               poster / backdrop / .nfo assets.
@@ -72,7 +74,7 @@ export function DownloadsSettings() {
           </div>
           <PathPicker
             value={resolvedPath}
-            placeholder="Choose a folder"
+            placeholder={t('downloads.chooseFolder')}
             onPick={pickDirectory}
             onReveal={openFolder}
             revealLabel="Open folder"
@@ -86,8 +88,8 @@ export function DownloadsSettings() {
         <SectionHeading>Queue</SectionHeading>
 
         <SettingRow
-          label="Concurrent downloads"
-          description="How many files can download at the same time (1–10)"
+          label={t('downloads.concurrent')}
+          description={t('downloads.concurrentDesc')}
         >
           <Select
             value={get('download_max_concurrent')}
@@ -105,14 +107,14 @@ export function DownloadsSettings() {
         </SettingRow>
 
         <SettingRow
-          label="Preferred quality"
-          description="Hint for provider streams that offer multiple renditions"
+          label={t('downloads.quality')}
+          description={t('downloads.qualityDesc')}
         >
           <Select
             value={get('download_preferred_quality')}
             onChange={(v) => set('download_preferred_quality', v)}
             options={[
-              { value: 'auto', label: 'Auto (highest)' },
+              { value: 'auto', label: t('value.autoHighest') },
               { value: '1080', label: '1080p' },
               { value: '720', label: '720p' },
               { value: '480', label: '480p' },
@@ -123,11 +125,11 @@ export function DownloadsSettings() {
       </div>
 
       <div className="space-y-2">
-        <SectionHeading>Companion assets</SectionHeading>
+        <SectionHeading>{t('downloads.companionAssets')}</SectionHeading>
 
         <SettingRow
-          label="Fetch poster / backdrop / .nfo"
-          description="Save Kodi-compatible metadata alongside each download"
+          label={t('downloads.fetchArtwork')}
+          description={t('downloads.fetchArtworkDesc')}
         >
           <Toggle
             checked={getBool('download_fetch_assets')}
@@ -136,8 +138,8 @@ export function DownloadsSettings() {
         </SettingRow>
 
         <SettingRow
-          label="Extract embedded subtitles"
-          description="Pull subtitle tracks out of the file after download completes"
+          label={t('downloads.extractSubs')}
+          description={t('downloads.extractSubsDesc')}
         >
           <Toggle
             checked={getBool('download_extract_subtitles')}
@@ -150,8 +152,8 @@ export function DownloadsSettings() {
         <SectionHeading>Safety</SectionHeading>
 
         <SettingRow
-          label="Maximum file size"
-          description="Refuse downloads that advertise a larger size"
+          label={t('downloads.maxSize')}
+          description={t('downloads.maxSizeDesc')}
         >
           <Select
             value={get('download_max_file_size_gb')}
@@ -162,14 +164,14 @@ export function DownloadsSettings() {
               { value: '25', label: '25 GB' },
               { value: '50', label: '50 GB' },
               { value: '100', label: '100 GB' },
-              { value: '0', label: 'No limit' },
+              { value: '0', label: t('value.noLimit') },
             ]}
           />
         </SettingRow>
 
         <SettingRow
-          label="Allow private network addresses"
-          description="Permit downloads from LAN / loopback hosts. Leave off unless you know why you need it."
+          label={t('downloads.allowPrivate')}
+          description={t('downloads.allowPrivateDesc')}
         >
           <Toggle
             checked={getBool('download_allow_private_ips')}
