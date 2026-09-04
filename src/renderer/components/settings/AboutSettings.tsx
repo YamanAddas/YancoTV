@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useT } from '../../i18n';
 
 // ---------------------------------------------------------------------------
 // About — app version, system info, database stats, credits
@@ -21,6 +22,7 @@ type UpdateState =
   | { kind: 'error'; error: string };
 
 export function AboutSettings() {
+  const t = useT();
   const [version, setVersion] = useState('...');
   const [dbStatus, setDbStatus] = useState<DbStatus>({});
   const [epgStats, setEpgStats] = useState<{
@@ -65,9 +67,9 @@ export function AboutSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-surface-100">About</h2>
+        <h2 className="text-lg font-semibold text-surface-100">{t('settingsTab.about')}</h2>
         <p className="mt-1 text-sm text-surface-500">
-          Application information and diagnostics
+          {t('about.desc')}
         </p>
       </div>
 
@@ -98,7 +100,7 @@ export function AboutSettings() {
             />
             <p className="text-sm text-surface-400">Version {version}</p>
             <p className="mt-0.5 text-xs text-surface-500">
-              Custom IPTV media application
+              {t('about.tagline')}
             </p>
           </div>
         </div>
@@ -129,7 +131,7 @@ export function AboutSettings() {
             value={dbStatus.sourceCount?.toLocaleString() ?? '—'}
           />
           <StatCard
-            label="Live Channels"
+            label={t('stats.liveChannels')}
             value={dbStatus.channelCount?.toLocaleString() ?? '—'}
           />
           <StatCard
@@ -141,11 +143,11 @@ export function AboutSettings() {
             value={dbStatus.seriesCount?.toLocaleString() ?? '—'}
           />
           <StatCard
-            label="EPG Programmes"
+            label={t('stats.epgProgrammes')}
             value={epgStats.programmeCount?.toLocaleString() ?? '—'}
           />
           <StatCard
-            label="EPG Channels"
+            label={t('stats.epgChannels')}
             value={epgStats.channelCount?.toLocaleString() ?? '—'}
           />
         </div>
@@ -162,20 +164,20 @@ export function AboutSettings() {
           System
         </h3>
         <div className="space-y-1.5 text-sm">
-          <InfoRow label="Platform" value={navigator.platform} />
-          <InfoRow label="User Agent" value={navigator.userAgent} />
+          <InfoRow label={t('about.platform')} value={navigator.platform} />
+          <InfoRow label={t('about.userAgent')} value={navigator.userAgent} />
           <InfoRow
             label="Screen"
             value={`${window.screen.width} x ${window.screen.height}`}
           />
-          <InfoRow label="Language" value={navigator.language} />
+          <InfoRow label={t('settings.language')} value={navigator.language} />
         </div>
       </section>
 
       {/* Tech stack */}
       <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
-          Built With
+          {t('about.builtWith')}
         </h3>
         <div className="flex flex-wrap gap-2">
           {[

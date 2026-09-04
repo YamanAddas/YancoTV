@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useEpgSettings, useEpgStats, triggerEpgRefresh } from '../../hooks/use-epg';
 import { useSettingsStore } from '../../stores/settings-store';
+import { useT } from '../../i18n';
 
 // ---------------------------------------------------------------------------
 // EPG Settings — global EPG URL, refresh controls, statistics
 // ---------------------------------------------------------------------------
 
 export function EpgSettings() {
+  const t = useT();
   const { data: settings } = useEpgSettings();
   const { data: stats } = useEpgStats();
   const { get, set: saveSetting, load } = useSettingsStore();
@@ -66,7 +68,7 @@ export function EpgSettings() {
       <div>
         <h2 className="text-lg font-semibold text-surface-100">EPG</h2>
         <p className="mt-1 text-sm text-surface-500">
-          Electronic Programme Guide settings and data management
+          {t('epg.desc')}
         </p>
       </div>
 
@@ -150,7 +152,7 @@ export function EpgSettings() {
               Auto-refresh interval
             </p>
             <p className="mt-0.5 text-xs text-surface-500">
-              How often EPG data is automatically updated
+              {t('epg.refreshDesc')}
             </p>
           </div>
           <select
@@ -158,10 +160,10 @@ export function EpgSettings() {
             onChange={(e) => saveSetting('epg_refresh_interval', e.target.value)}
             className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
           >
-            <option value={6}>Every 6 hours</option>
-            <option value={12}>Every 12 hours</option>
-            <option value={24}>Every 24 hours</option>
-            <option value={48}>Every 2 days</option>
+            <option value={6}>{t('interval.6h')}</option>
+            <option value={12}>{t('interval.12h')}</option>
+            <option value={24}>{t('interval.24h')}</option>
+            <option value={48}>{t('interval.2d')}</option>
           </select>
         </div>
       </section>
@@ -173,14 +175,14 @@ export function EpgSettings() {
         </h3>
         <div className="grid grid-cols-3 gap-3">
           <StatCard
-            label="Programmes"
+            label={t('stats.programmes')}
             value={stats?.programmeCount?.toLocaleString() ?? '—'}
           />
           <StatCard
-            label="Channels"
+            label={t('stats.channels')}
             value={stats?.channelCount?.toLocaleString() ?? '—'}
           />
-          <StatCard label="Last Refresh" value={lastRefreshed} small />
+          <StatCard label={t('stats.lastRefresh')} value={lastRefreshed} small />
         </div>
       </section>
     </div>

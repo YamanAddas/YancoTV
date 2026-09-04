@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParentalStore } from '../../stores/parental-store';
+import { useT } from '../../i18n';
 
 // ---------------------------------------------------------------------------
 // Parental Controls Settings — PIN management, content restrictions
 // ---------------------------------------------------------------------------
 
 export function ParentalSettings() {
+  const t = useT();
   const {
     settings,
     loaded,
@@ -90,10 +92,10 @@ export function ParentalSettings() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-surface-100">
-          Parental Controls
+          {t('settingsTab.parental')}
         </h2>
         <p className="mt-1 text-sm text-surface-500">
-          Restrict access to content and app settings
+          {t('parental.desc')}
         </p>
       </div>
 
@@ -159,7 +161,7 @@ export function ParentalSettings() {
                   onChange={(e) =>
                     setConfirmPin(e.target.value.replace(/\D/g, ''))
                   }
-                  placeholder="Re-enter"
+                  placeholder={t('parental.reEnter')}
                   className="w-36 rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
                 />
               </div>
@@ -181,7 +183,7 @@ export function ParentalSettings() {
                   }}
                   className="rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10"
                 >
-                  Remove PIN
+                  {t('parental.removePin')}
                 </button>
               )}
             </div>
@@ -192,7 +194,7 @@ export function ParentalSettings() {
         {removingPin && (
           <div className="space-y-3 border-t border-accent/5 pt-4">
             <p className="text-sm font-medium text-red-400">
-              Enter current PIN to remove it
+              {t('parental.removePinDesc')}
             </p>
             <input
               type="password"
@@ -200,7 +202,7 @@ export function ParentalSettings() {
               maxLength={6}
               value={currentPin}
               onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, ''))}
-              placeholder="Current PIN"
+              placeholder={t('parental.currentPin')}
               className="w-36 rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
               autoFocus
             />
@@ -209,7 +211,7 @@ export function ParentalSettings() {
                 onClick={handleRemovePin}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
               >
-                Confirm Remove
+                {t('parental.confirmRemove')}
               </button>
               <button
                 onClick={() => {
@@ -234,18 +236,18 @@ export function ParentalSettings() {
       {/* Content Restrictions */}
       <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
-          Content Restrictions
+          {t('parental.contentRestrictions')}
         </h3>
         <div className="space-y-2">
           <ToggleRow
-            label="Hide adult content"
-            description="Filter out channels and VOD tagged as adult/18+"
+            label={t('parental.hideAdult')}
+            description={t('parental.hideAdultDesc')}
             checked={settings.hideAdultContent}
             onChange={handleToggleHideAdult}
           />
           <ToggleRow
-            label="Require PIN for settings"
-            description="Ask for PIN before opening the Settings page"
+            label={t('parental.requirePin')}
+            description={t('parental.requirePinDesc')}
             checked={settings.requirePinForSettings}
             onChange={handleToggleRequirePin}
             disabled={!settings.pinSet}
@@ -261,7 +263,7 @@ export function ParentalSettings() {
       {/* Channel management info */}
       <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
-          Channel Management
+          {t('parental.channelManagement')}
         </h3>
         <p className="text-sm text-surface-400">
           To lock or hide individual channels, right-click on any channel card
