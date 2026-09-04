@@ -8,11 +8,11 @@ A premium IPTV player that organizes content from M3U playlists, Xtream Codes, a
 
 ## Apps
 
-- **Desktop (Windows)** — Electron + React + TypeScript + mpv. Feature-complete (v0.2.0). See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md).
+- **Desktop (Windows)** — Electron + React + TypeScript + mpv. Feature-complete (**v0.3.8**, last release 2026-05-27). See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md).
 - **Android / Android TV / Fire TV / Google TV** — Native Kotlin + Jetpack Compose + Media3. Active development as of 2026-04-20. See [PRODUCTION_PLAN_NATIVE.md](PRODUCTION_PLAN_NATIVE.md).
-- **iOS / iPadOS** — SwiftUI + shared Kotlin framework. Scheduled post-Android-1.0.
+- **iOS / iPadOS** — SwiftUI + shared Kotlin framework, in a **separate repo** (`YamanAddas/YancoTV-iOS`) that forks this monorepo and shares `packages/shared/`.
 
-The Android and iOS apps share business logic via a Kotlin Multiplatform module (`packages/shared/`). The desktop app uses a parallel TypeScript implementation (`packages/core/`) — two mirrored ports, tests on both sides, neither is the source.
+The Android and iOS apps share business logic via a Kotlin Multiplatform module (`packages/shared/`). The desktop app uses a separate TypeScript implementation (`packages/core/`). The two cores are **independent and are not required to match** — each carries what its own apps need.
 
 **Frozen:** the earlier React Native app in `packages/mobile/`. Superseded 2026-04-20 after Fire TV bridge issues; kept runnable for reference. No new work except P0 fixes. See [docs/adr/0001-native-pivot.md](docs/adr/0001-native-pivot.md) for why.
 
@@ -68,13 +68,23 @@ Release output: `packages/android/app/build/outputs/apk/release/app-<abi>-releas
 
 ### iOS
 
-Scheduled post-Android-1.0. Will open `packages/ios/YancoTV.xcodeproj` in Xcode 16+; shared Kotlin framework built via `./gradlew :shared:linkReleaseFrameworkIosArm64`.
+Developed in the separate `YamanAddas/YancoTV-iOS` repository, not here — this tree has no `packages/ios/`. That repo forks this monorepo, so it also carries `packages/shared/`, and improvements made there are merged back (MK.36).
 
 ## Current status
 
-- **Desktop:** Phase 1 feature-complete (Sprints 1–20 DONE, Sprint 21 stabilization mostly done; Sprint 21.6 human QA against real sources pending before release sign-off).
-- **Android:** MK.0 through MK.8 landed — scaffold, shared core port, SQLDelight schema, sources, shell UI (hero-centric browse), channel list, shared ExoPlayer with mini-to-fullscreen handoff, XMLTV EPG, Catch-up / Timeshift / Favorites / History / Search / Settings / Parental. Target: ~12 weeks from 2026-04-20 to Android 1.0. See [PRODUCTION_PLAN_NATIVE.md](PRODUCTION_PLAN_NATIVE.md) for the full milestone breakdown.
-- **iOS:** not started. Begins post-Android-1.0.
+*Reviewed 2026-09-04. The previous text here said Android was at "MK.0 through MK.8" and iOS was
+"not started"; both had been stale for months.*
+
+- **Desktop:** feature-complete at **v0.3.8** (2026-05-27). Sprints 1–20 done, Sprint 21
+  stabilization mostly done; Sprint 21.6 human QA against real sources still pending before release
+  sign-off. Six services the architecture doc listed as "planned" have all shipped.
+- **Android:** **MK.37** in progress; MK.0–MK.36 landed. Shipping as **v1.6.7** (versionCode 31) on
+  Fire TV and Chromecast with Google TV. Beyond the MK.8 list this now includes recordings, backup
+  and restore, full i18n across four locales with RTL, cast, TMDb metadata, OpenSubtitles, an
+  in-app updater, and a portrait phone shell. See
+  [PRODUCTION_PLAN_NATIVE.md](PRODUCTION_PLAN_NATIVE.md).
+- **iOS:** under active development in the separate `YamanAddas/YancoTV-iOS` repository, ahead of
+  this tree on shared-core work. MK.36 merged that shared core back into this repo.
 
 ## License
 

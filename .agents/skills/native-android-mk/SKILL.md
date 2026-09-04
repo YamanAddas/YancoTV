@@ -78,7 +78,8 @@ Prefer the smallest verification loop that proves the change:
 - Shared logic: `./gradlew :shared:commonTest :shared:androidUnitTest`
 - Android compile: `./gradlew :app:compileDebugKotlin`
 - Android build: `./gradlew :app:assembleDebug`
-- Fire TV install when device behavior matters: connect `192.168.68.56:5555`, then `./gradlew :app:installDebug`
+- Fire TV install when device behavior matters: connect `192.168.68.66:5555` (DHCP — verify with `adb devices -l`), then `./gradlew :app:installDebug`.
+  With more than one device attached, `installDebug` targets them ALL and dies on signature mismatch against a TV running release — install one at a time with `adb -s <serial> install -r <apk>` and confirm the output says `Success`
 
 Set `JAVA_HOME` to `C:\Program Files\Android\Android Studio\jbr` for Gradle work on this machine.
 

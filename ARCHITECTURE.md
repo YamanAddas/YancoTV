@@ -1,8 +1,26 @@
 # YancoTV — Architecture
 
-## Two Apps, One Core
+## Three Apps, Two Cores
 
-YancoTV ships as two sibling apps driven by a shared TypeScript core.
+> **Accuracy note, 2026-09-04.** This document said "Two Apps, One Core" and described the React
+> Native app across eleven sections while the *actively developed* native Android app had none. It
+> also listed six services as "not yet implemented" that had all shipped. Both are corrected below.
+> Where a section still describes the frozen RN app it now says so in its own heading.
+
+YancoTV ships as three sibling apps over **two** independent business cores.
+
+| App | Where | Core it runs on | Status |
+|---|---|---|---|
+| Desktop (Electron, Windows) | `src/` | `packages/core/` (TypeScript) | Shipping, v0.3.8 |
+| Android / Android TV / Fire TV | `packages/android/` | `packages/shared/` (Kotlin Multiplatform) | **Active development**, v1.6.7 |
+| React Native | `packages/mobile/` | `packages/core/` (TypeScript) | **Frozen 2026-04-20**, reference only |
+
+The two cores are **not mirrors of each other** and are not required to match — see the two-ports
+note in [AGENTS.md](AGENTS.md). iOS is developed in a separate repository
+(`YamanAddas/YancoTV-iOS`) and shares `packages/shared/`; there is no `packages/ios/` in this tree.
+
+The diagram below is the original TypeScript-core picture. It is accurate for **desktop and the
+frozen RN app**; the Android app does not use `@yancotv/core` at all.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -195,16 +213,27 @@ interface IPlayer {
 | Favorites Store | `favorites-store.ts` | Favorites as join table to content with timestamps |
 | History Store | `history-store.ts` | Watch history with resume positions, grouped by content+episode, throttled updates |
 
-### Planned (Not Yet Implemented)
+### Shipped since this table was written
 
-| Service | File | Sprint | Purpose |
-|---------|------|--------|---------|
-| Recording Service | `recording-service.ts` | 12 | ffmpeg-based live recording + scheduler |
-| Download Manager | `download-manager.ts` | 13 | Queue-based VOD download manager |
-| Metadata Service | `metadata-service.ts` | 14 | TMDb API integration, title matching |
-| Subtitle Service | `subtitle-service.ts` | 15 | OpenSubtitles API, subtitle file management |
-| Backup Service | `backup-service.ts` | 18 | Export/import user data |
-| Notification Service | `notification-service.ts` | 19 | In-app toasts, programme reminders |
+Every row below was once listed here as "Planned (Not Yet Implemented)". **All six shipped**, four
+of them under a different filename than was planned — which is why the old table read as a to-do
+list for work that already existed. Each was confirmed present *and* reachable: the file exists and
+the feature has live IPC channels in `src/shared/ipc-channels.ts`.
+
+| Service | Planned as | Actually shipped as | IPC channels |
+|---------|-----------|---------------------|--------------|
+| Recording | `recording-service.ts` | `recording-service.ts` | 10 |
+| Downloads | `download-manager.ts` | `download-service.ts` | 13 |
+| Metadata / TMDb | `metadata-service.ts` | `tmdb-service.ts` + `tmdb-client.ts` | 6 |
+| Subtitles | `subtitle-service.ts` | `subtitle-cache-service.ts` + `subtitle-extractor.ts` + `opensubtitles-client.ts` | 13 |
+| Backup | `backup-service.ts` | `backup-service.ts` | 3 |
+| Reminders | `notification-service.ts` | `reminder-service.ts` | 8 |
+
+Other services present in `src/main/services/` and not described anywhere above: `asset-fetcher`,
+`content-classifier`, `crash-handler`, `db`, `ffmpeg-path`, `group-preferences-store`, `m3u-parser`,
+`nfo-writer`, `node-http-client`, `source-manager`, `source-sync`, `stalker-client`, `tray-service`,
+`update-service`, `xtream-client` — **35 files** plus a `migrations/` directory. `ls src/main/services/` is the authority; this
+document is a map, not an index.
 
 ## Database Schema (SQLite)
 
@@ -418,7 +447,63 @@ All channels defined in `src/shared/ipc-channels.ts`:
 
 ---
 
-## Mobile System Overview
+## Native Android System Overview
+
+The actively developed app, and the one this document previously said nothing about. It shares
+**no code** with the desktop app: its business logic is `packages/shared/` (Kotlin Multiplatform),
+not `@yancotv/core`.
+
+| Concern | Choice | Where |
+|---|---|---|
+| UI | Jetpack Compose; `androidx.tv.material` for TV focus targets, Material3 on phone | `packages/android/app/src/main/java/com/yancotv/android/ui/` |
+| Playback | Media3 ExoPlayer, **exactly one instance**, owned by `PlaybackController` | `.../android/player/PlaybackController.kt` |
+| Persistence | SQLDelight over SQLite — the only DB surface on native | `packages/shared/src/commonMain/sqldelight/` (20 `.sq` files) |
+| Networking | Ktor + kotlinx.serialization (no Retrofit/Moshi/Gson — they do not compile for iOS) | `packages/shared/.../http/` |
+| DI | Koin | `.../android/di/` |
+| Images | Coil 3 | — |
+| Background work | WorkManager (EPG reminders, source sync) | `.../android/work/` |
+| Crash reporting | Sentry | `packages/android/local.properties` holds the DSN |
+| Credentials | Android Keystore. Never SQLite, never a settings file, never a log | — |
+
+**Two rules that look like duplication and are not.**
+
+- **One ExoPlayer.** The mini-preview and fullscreen player are the *same* player with its output
+  Surface swapped (`setVideoSurface` / `clearVideoSurface`, symmetric on entry **and** exit). Not
+  `PlayerView.switchTargetView()`, which this codebase does not call. ADR 0001 predates this and
+  names `switchTargetView()`; the ADR records what was decided then, the rule here is what the code
+  does now.
+- **`AndroidEpgImporter`, not the shared `EpgRepository.refresh()`.** The shared path materialises
+  the whole XMLTV body and exhausts a Fire TV's heap (MB-230), so Android streams the import to a
+  temp file instead. This is a deliberate platform divergence, not drift — and it is why the shared
+  name-matching index (`epg_channel_names`) is never populated on Android.
+
+**Sync path, worth knowing before touching it.** `SourceRepository.syncSource` → `BulkContentWriter`
+(`packages/shared/.../sources/BulkContentWriter.kt`). Two constraints there have already caused data
+loss and a performance regression respectively, and they interact: the destructive clear runs only
+*after* replacement rows are in hand (MB-353), and it is broken into bounded transactions so it
+cannot hold the write lock long enough to starve a UI write (MB-315). `content_fts` is an **fts4**
+virtual table, which indexes no column — anything shaped like `WHERE content_id IN (...)` scans the
+entire index, so it must never be put inside a loop (MB-402).
+
+**Schema units, the trap.** Timestamps are **milliseconds**, except `watch_history.position_seconds`
+/ `duration_seconds` (media offsets) and `epg_programmes.start_time` / `end_time`, which are XMLTV
+epoch **seconds** and are compared against `clock() / 1000`. "Correcting" the EPG columns to
+milliseconds empties the guide silently — that was MB-390.
+
+**Adaptive layout.** Window shape is measured once into `ShellMetrics` and read through
+`LocalShellMetrics`; `usesSidebar` / `usesCoverflow` are the single source of truth for whether a
+window gets the TV sidebar or the phone bottom bar. Nothing else may re-derive that from a width.
+
+---
+
+> **The eleven sections below describe the FROZEN React Native app** (`packages/mobile/`,
+> superseded 2026-04-20 — see [docs/adr/0001-native-pivot.md](docs/adr/0001-native-pivot.md)). They
+> are kept because the RN app is still runnable for reference. **They do not describe the shipping
+> Android app** — that is the section above. Several file names in them are also stale: the RN app
+> uses `*-store.ts`, not the `*-repo.ts` these tables name, and there is no
+> `packages/mobile/src/services/keychain.ts`.
+
+## Mobile System Overview (frozen RN app)
 
 The mobile app ships a single React Native APK that targets Android TV, Google TV, Fire TV, and Android phones/tablets. Unlike the desktop app, there is no process boundary between UI and services — everything runs inside the JS bundle plus native Android modules.
 
@@ -455,7 +540,7 @@ The mobile app ships a single React Native APK that targets Android TV, Google T
 - OS-level credential encryption goes through Android Keystore via react-native-keychain (no Electron safeStorage)
 - One navigator switches drawer (TV) vs. bottom tabs (phone) off `Platform.isTV`; UI components branch on the same flag
 
-## Mobile Process Model
+## Mobile Process Model (frozen RN app)
 
 The React Native runtime is split across the JavaScript bundle (Hermes engine) and the native Android layer. Our code runs in four zones:
 
@@ -468,7 +553,7 @@ The React Native runtime is split across the JavaScript bundle (Hermes engine) a
 
 There is NO separate "main process" — the JS bundle owns all business logic and orchestrates the native modules directly.
 
-## Mobile Data Flow
+## Mobile Data Flow (frozen RN app)
 
 ### Adding a Source
 
@@ -500,7 +585,7 @@ User clicks a channel (ChannelListScreen or Content Detail)
 
 No IPC hop. No process boundary. The UI, the store, and the DB call all happen in the same JS runtime; only the video surface + persistence engine cross into native.
 
-## Mobile Services
+## Mobile Services (frozen RN app)
 
 Everything the desktop does in `src/main/services/` has a mobile counterpart. Some live in `@yancotv/core` (shared), others in `packages/mobile/src/` (platform-specific).
 
@@ -529,7 +614,7 @@ Everything the desktop does in `src/main/services/` has a mobile counterpart. So
 | `subtitle-service.ts` | Same client; file I/O mobile-local (RNFS) | `@yancotv/core` + mobile | M7 |
 | `settings-service.ts` | `packages/mobile/src/db/settings-repo.ts` | mobile | M7 |
 
-## Mobile Player Abstraction
+## Mobile Player Abstraction (frozen RN app)
 
 The desktop `IPlayer` interface (see above) is mirrored on mobile. The mobile implementation (`packages/mobile/src/player/rn-video-player.ts`, M4) wraps react-native-video:
 
@@ -551,7 +636,7 @@ Benefits:
 - Swapping backends (e.g. to a VLC-based player for broader codec support) is a one-file change
 - The existing desktop `player-store` logic ports over with only the `IPlayer` constructor wiring changed
 
-## Mobile Persistence Model
+## Mobile Persistence Model (frozen RN app)
 
 Post-M2 the app has three storage tiers:
 
@@ -578,7 +663,7 @@ Android Keystore (via react-native-keychain)
 
 **Why AsyncStorage stays in the picture:** it's the fastest hydration path for small Zustand state (which tab was active, whether the DB is ready). Content lists never touch it — historically, persisting 10K channels there triggered `SQLITE_FULL` until the 64MB cap was raised, and op-sqlite closes that door entirely.
 
-## Mobile State Management
+## Mobile State Management (frozen RN app)
 
 Same Zustand stores, same shapes as desktop — only the backing service differs:
 
@@ -595,7 +680,7 @@ Action signatures match one-for-one (e.g. `play(url, title, contentId)` exists o
 
 Hydration lives in `App.tsx`'s hydration gate: AsyncStorage restores small keys first, op-sqlite opens on a background task, and the UI unblocks once both resolve. Long-lived content arrays are NEVER persisted to AsyncStorage — they're queried on demand.
 
-## Mobile Navigation
+## Mobile Navigation (frozen RN app)
 
 React Navigation 7, installed in M3. The root navigator branches once on `Platform.isTV`:
 
@@ -618,7 +703,7 @@ React Navigation 7, installed in M3. The root navigator branches once on `Platfo
 
 After M3 the ad-hoc `ScreenRouter.tsx` / `nav-store.ts` pattern is deleted. All navigation flows through React Navigation's `navigate()` / linking config / deep links. Phase 2's manual router was a scaffolding crutch — no new screens should reach for it.
 
-## Mobile Focus Model
+## Mobile Focus Model (frozen RN app)
 
 TV focus is handled by a single primitive — either a `<Focusable>` wrapper or `TVFocusGuideView` from `react-native-tvos`. Rules:
 
@@ -629,7 +714,7 @@ TV focus is handled by a single primitive — either a `<Focusable>` wrapper or 
 
 No screen rolls its own focus logic — all TV-specific behavior goes through the shared primitive. Debugging focus? Enable the focus-overlay switch (added in M3.8) that outlines the currently-focused element in red.
 
-## Mobile Security Model
+## Mobile Security Model (frozen RN app)
 
 | Concern | Mitigation |
 |---|---|
@@ -642,7 +727,7 @@ No screen rolls its own focus logic — all TV-specific behavior goes through th
 
 No Electron-specific concerns apply (no `contextIsolation`, no preload bridge to harden) — but the native-module surface adds its own risks: any third-party module added ships with native code that we can't fully audit. Every native dep landing in package.json needs a brief review of its permissions footprint in the Android manifest.
 
-## Mobile Build & Distribution
+## Mobile Build & Distribution (frozen RN app)
 
 ```
 pnpm android                → local Gradle build (debug APK)

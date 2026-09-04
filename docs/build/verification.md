@@ -5,7 +5,7 @@ test runs on a real Fire TV via `adb broadcast` to a debug-only receiver
 (declared in `app/src/debug/AndroidManifest.xml`, never compiled into release).
 
 **Prerequisites:**
-- Fire TV connected: `adb connect 192.168.68.56:5555`
+- Fire TV connected: `adb connect 192.168.68.66:5555` (DHCP — verify with `adb devices -l`, `model:AFTDCT31`)
 - Debug APK installed: `./gradlew :app:installDebug` from `packages/android/`
 - App launched and running on the device (broadcasts to a stopped/killed
   process don't fire)
@@ -19,12 +19,12 @@ rebuild → restore → emit-signal flow that fires on a real FFmpeg-package
 error, just triggered synthetically.
 
 ```bash
-adb -s 192.168.68.56:5555 logcat -c
-adb -s 192.168.68.56:5555 shell am broadcast \
+adb -s 192.168.68.66:5555 logcat -c
+adb -s 192.168.68.66:5555 shell am broadcast \
     -p com.yancotv.android \
     -a com.yancotv.android.debug.WATCHDOG_SMOKE_TEST
 sleep 4
-adb -s 192.168.68.56:5555 logcat -d -t 200 | grep -iE 'YancoWatchdogSmoke|ExoPlayerImpl: Init|FfmpegAudioRenderer|FfmpegVideoRenderer'
+adb -s 192.168.68.66:5555 logcat -d -t 200 | grep -iE 'YancoWatchdogSmoke|ExoPlayerImpl: Init|FfmpegAudioRenderer|FfmpegVideoRenderer'
 ```
 
 **The `-p com.yancotv.android` flag is required** — Android 8+ blocks
@@ -59,12 +59,12 @@ Confirms the SDK is initialized, the network path to `sentry.io` works, and
 events reach the project dashboard.
 
 ```bash
-adb -s 192.168.68.56:5555 logcat -c
-adb -s 192.168.68.56:5555 shell am broadcast \
+adb -s 192.168.68.66:5555 logcat -c
+adb -s 192.168.68.66:5555 shell am broadcast \
     -p com.yancotv.android \
     -a com.yancotv.android.debug.SENTRY_SMOKE_TEST
 sleep 10
-adb -s 192.168.68.56:5555 logcat -d -t 500 | grep -iE 'YancoSentrySmoke|Sentry'
+adb -s 192.168.68.66:5555 logcat -d -t 500 | grep -iE 'YancoSentrySmoke|Sentry'
 ```
 
 **Success looks like:**
@@ -122,11 +122,11 @@ companions, Sentry reflective lookups, and SQLDelight runtime adapters.
 ```bash
 cd packages/android
 ./gradlew :app:assembleRelease
-adb -s 192.168.68.56:5555 install -r app/build/outputs/apk/release/app-release.apk
-adb -s 192.168.68.56:5555 logcat -c
-adb -s 192.168.68.56:5555 shell am start -n com.yancotv.android/.MainActivity
+adb -s 192.168.68.66:5555 install -r app/build/outputs/apk/release/app-release.apk
+adb -s 192.168.68.66:5555 logcat -c
+adb -s 192.168.68.66:5555 shell am start -n com.yancotv.android/.MainActivity
 sleep 10
-adb -s 192.168.68.56:5555 logcat -d -t 800 | grep -iE 'ExoPlayerImpl|Ffmpeg|Sentry|FATAL'
+adb -s 192.168.68.66:5555 logcat -d -t 800 | grep -iE 'ExoPlayerImpl|Ffmpeg|Sentry|FATAL'
 ```
 
 **Success looks like:**

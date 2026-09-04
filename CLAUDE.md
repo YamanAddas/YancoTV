@@ -16,7 +16,9 @@ Everything above is the cross-tool guide. The rest of this file is Claude Code-s
 - Commits: one `MK.*` sub-task per commit on native. MK.8 shipped three sub-tasks in one commit and the bug count scaled with commit size.
 - Before committing a shell screen, self-audit against the `native-android-mk` skill checklist.
 - **Don't push** without an explicit ask. Build + install + commit is fine; `git push` is not.
-- **Fire TV is the canonical test target for native.** `adb connect 192.168.68.56:5555`, `./gradlew :app:installDebug` from `packages/android/`. Test on the phone (HT74J0206349) too for phone-specific code.
+- **Fire TV is the canonical test target for native.** `adb connect 192.168.68.66:5555`, `./gradlew :app:installDebug` from `packages/android/`. Test on the phone (HT74J0206349) too for phone-specific code.
+- **Confirm the address before trusting it.** The Fire TV's address is DHCP and has moved at least twice (`.56` -> `.74` -> `.66`); `adb devices -l` and look for `model:AFTDCT31` rather than trusting a number in a doc. A second TV (Chromecast with Google TV, `model:Chromecast`) pairs over wireless debugging and appears as an `adb-...._tcp` serial, not an IP.
+- **`installDebug` installs to EVERY connected device.** With a TV on a release build attached it fails on signature mismatch and the phone silently never gets the build. Install one device at a time with `adb -s <serial> install -r <apk>` whenever more than one is connected, and check the output says `Success`.
 
 ## Self-checks before calling something "done"
 

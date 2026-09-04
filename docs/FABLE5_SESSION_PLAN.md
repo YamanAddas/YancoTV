@@ -1,5 +1,12 @@
 # Fable 5 + ultracode — next session plan
 
+> **Historical — superseded 2026-09-04.** This was written 2026-07-31 for the session that followed
+> it, and that session happened. It is kept for its reasoning, not as instructions: the milestone
+> numbering, the open-work list and the device addresses in it are all stale (the Fire TV it names
+> as `192.168.68.56` is at `.66` today). For current device facts see [QA_MATRIX.md](../QA_MATRIX.md);
+> for current work see [PRODUCTION_PLAN_NATIVE.md](../PRODUCTION_PLAN_NATIVE.md).
+
+
 **Written 2026-07-31.** Produced by a 6-auditor survey of the repo followed by a
 3-design / 3-judge panel (12 agents, ~1.3M subagent tokens). Every load-bearing
 claim below was re-verified against source before being written down — six of the

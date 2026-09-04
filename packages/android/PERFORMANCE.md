@@ -185,7 +185,7 @@ p95 ≈ 2730 ms (small sample). **0 / 18 samples below 400 ms.**
 
 ### Setup
 ```bash
-adb connect 192.168.68.56:5555         # Fire TV AFTDCT31
+adb connect 192.168.68.66:5555         # Fire TV AFTDCT31 (DHCP; verify with adb devices -l)
 JAVA_HOME='/c/Program Files/Android/Android Studio/jbr' \
   ./gradlew -p packages/android :app:installDebug
 ```

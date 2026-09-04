@@ -8,11 +8,16 @@
 
 ## Device matrix
 
+Addresses are DHCP and have moved more than once. **Identify a device by `model:` in
+`adb devices -l`, not by the number in this table** — a stale IP has already caused a session to
+install onto the wrong box. Values below were re-verified 2026-09-04.
+
 | Tier | Device | Status | Notes |
 |---|---|---|---|
-| Primary | Fire TV AFTDCT31 (192.168.68.56) | Daily-driver during dev | All Stage 1–5 features verified hands-on |
-| Primary | Phone HT74J0206349 | Lighter testing | Phone-specific MK rules apply |
-| Tier 2 | Google TV (living room, 192.168.68.52) | adb-discoverable, never authorised | First test target after the friend-group beta |
+| Primary | Fire TV AFTDCT31 (`model:AFTDCT31`, .66) | Daily-driver during dev | Android 9 / API 28. All Stage 1–5 features verified hands-on. Was `.56`, then `.74` |
+| Primary | Chromecast with Google TV (`model:Chromecast`, .70) | Regular second TV target | Android 14 / API 34. Pairs over **wireless debugging** — shows up as an `adb-…_tcp` serial, not an IP. **Must be given a release build**; a debug APK is a signature mismatch, and uninstalling to force it is data loss |
+| Primary | Phone HT74J0206349 | Lighter testing | Phone-specific MK rules apply. Carries a **debug** build, so it seeds a free sample playlist full of dead links — Live TV failing there is usually the data, not the app |
+| Tier 2 | Unknown host at 192.168.68.52 | Answers adb on 5555, never authorised | Listed here since 2026-04 as "Google TV (living room)". It is **not** the Chromecast above, which reports its own address as .70. What it actually is has never been confirmed |
 | Tier 3 | Fire TV Stick 4K | Not on hand | Friend with one to test |
 | Tier 3 | Mid-range Android TV box (any) | Not on hand | Friend with one to test |
 | Tier 3 | Google TV emulator | Optional | Run when something specific to AOSP-TV needs verification |

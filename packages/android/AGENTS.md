@@ -54,6 +54,6 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 .\gradlew.bat :app:installDebug
 ```
 
-Fire TV target: `192.168.68.56:5555`.
+Fire TV target: `192.168.68.66:5555` (DHCP — confirm with `adb devices -l`, `model:AFTDCT31`).
 
 Do not push without an explicit user request.

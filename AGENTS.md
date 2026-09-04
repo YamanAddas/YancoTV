@@ -6,9 +6,9 @@ Cross-tool rules for AI coding agents (Claude Code, Codex, Cursor, Copilot, Wind
 
 Custom IPTV app. Three sibling apps on a shared business core:
 
-- **Desktop (Electron)** — `src/`, feature-complete (v0.2.0). TS + mpv + SQLite.
+- **Desktop (Electron)** — `src/`, feature-complete (**v0.3.8**, 2026-05-27). TS + mpv + SQLite.
 - **Android / Android TV (native Kotlin + KMP)** — `packages/android/` + `packages/shared/`. Active as of 2026-04-20.
-- **iOS / iPadOS (SwiftUI + KMP)** — `packages/ios/`, post-Android-1.0.
+- **iOS / iPadOS (SwiftUI + KMP)** — developed in a **separate repository**, `YamanAddas/YancoTV-iOS`, which is a fork of this whole monorepo and shares `packages/shared/`. There is no `packages/ios/` in this tree.
 
 **Frozen:** `packages/mobile/` (React Native). No new work except P0.
 
@@ -28,7 +28,7 @@ cd packages/android && ./gradlew :app:installDebug        # Android to connected
 ./gradlew :shared:allTests                                 # all targets (JVM + iOS klib if present)
 ```
 
-Fire TV target for native: `adb connect 192.168.68.56:5555` then `installDebug`. `JAVA_HOME` must point at Android Studio's JBR.
+Fire TV target for native: `adb connect 192.168.68.66:5555` then `installDebug` — The Fire TV's address is DHCP and has moved at least twice (`.56` -> `.74` -> `.66`); `adb devices -l` and look for `model:AFTDCT31` rather than trusting a number in a doc. `JAVA_HOME` must point at Android Studio's JBR.
 
 ## Hard rules
 
