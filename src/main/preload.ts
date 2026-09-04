@@ -518,13 +518,6 @@ const api = {
       | { ok: false; cancelled?: boolean; error?: string }
     > => ipcRenderer.invoke(IpcChannels.BACKUP_IMPORT, mode),
   },
-
-  window: {
-    minimize: () => ipcRenderer.invoke(IpcChannels.WINDOW_MINIMIZE),
-    maximize: () => ipcRenderer.invoke(IpcChannels.WINDOW_MAXIMIZE),
-    close: () => ipcRenderer.invoke(IpcChannels.WINDOW_CLOSE),
-    isMaximized: () => ipcRenderer.invoke(IpcChannels.WINDOW_IS_MAXIMIZED),
-  },
 };
 
 export type ApiType = typeof api;

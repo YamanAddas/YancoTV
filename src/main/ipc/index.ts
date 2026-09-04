@@ -1674,29 +1674,6 @@ export function registerIpcHandlers(): void {
     return { ok: true, fullscreen: main.isFullScreen() };
   });
 
-  // Window controls (custom titlebar)
-  ipcMain.handle(IpcChannels.WINDOW_MINIMIZE, () => {
-    getMainWindow()?.minimize();
-  });
-
-  ipcMain.handle(IpcChannels.WINDOW_MAXIMIZE, () => {
-    const main = getMainWindow();
-    if (!main) return;
-    if (main.isMaximized()) {
-      main.unmaximize();
-    } else {
-      main.maximize();
-    }
-  });
-
-  ipcMain.handle(IpcChannels.WINDOW_CLOSE, () => {
-    getMainWindow()?.close();
-  });
-
-  ipcMain.handle(IpcChannels.WINDOW_IS_MAXIMIZED, () => {
-    return getMainWindow()?.isMaximized() ?? false;
-  });
-
   // mpv availability check
   ipcMain.handle(IpcChannels.PLAYER_CHECK_MPV, () => {
     return { available: findMpvPath() !== null };

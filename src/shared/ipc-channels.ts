@@ -197,11 +197,12 @@ export const IpcChannels = {
   // Manual update check (the About tab button). Full auto-update lives on 18.3.
   APP_CHECK_FOR_UPDATES: 'app:checkForUpdates',
 
-  // Window controls (custom titlebar)
-  WINDOW_MINIMIZE: 'window:minimize',
-  WINDOW_MAXIMIZE: 'window:maximize',
-  WINDOW_CLOSE: 'window:close',
-  WINDOW_IS_MAXIMIZED: 'window:isMaximized',
+  // (Removed 2026-09-04.) The four `window:*` channels drove a custom
+  // titlebar that was never mounted: `Titlebar.tsx` was imported by nothing,
+  // and the main window is created WITHOUT `frame: false`, so Windows draws
+  // its own chrome and a custom bar could not have appeared. Deleting them
+  // narrows the IPC surface the renderer can reach. Restore from git history
+  // if a frameless window is ever wanted.
 
   // Player — mpv availability check
   PLAYER_CHECK_MPV: 'player:checkMpv',

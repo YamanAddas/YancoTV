@@ -132,3 +132,89 @@ describe('Credential Store', () => {
     });
   });
 });
+
+describe('Credential decryption refuses to invent a credential from binary', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * The legacy fallback is why this function is forgiving at all: rows written
+   * before encryption was enforced are readable plaintext and must keep working
+   * across an upgrade.
+   */
+  it('still reads a legacy plaintext row when decryption fails', () => {
+    mockSafeStorage.isEncryptionAvailable.mockReturnValue(true);
+    mockSafeStorage.decryptString.mockImplementation(() => {
+      throw new Error('not encrypted by this keyring');
+    });
+    expect(decryptCredential(Buffer.from('my-username', 'utf-8'))).toBe('my-username');
+  });
+
+  it('reads legacy plaintext containing non-ASCII text', () => {
+    mockSafeStorage.isEncryptionAvailable.mockReturnValue(true);
+    mockSafeStorage.decryptString.mockImplementation(() => {
+      throw new Error('boom');
+    });
+    // Arabic is a first-class locale on the sibling app; a password can hold it.
+    expect(decryptCredential(Buffer.from('كلمة-سر', 'utf-8'))).toBe('كلمة-سر');
+  });
+
+  /**
+   * The behaviour this change exists for. Previously a blob that failed to
+   * decrypt was returned as `buf.toString('utf-8')`, so corrupt or foreign
+   * bytes became a "credential" and travelled into a provider URL — surfacing
+   * as a baffling auth failure rather than the storage fault it is.
+   */
+  it('throws rather than returning binary that failed to decrypt', () => {
+    mockSafeStorage.isEncryptionAvailable.mockReturnValue(true);
+    mockSafeStorage.decryptString.mockImplementation(() => {
+      throw new Error('bad ciphertext');
+    });
+    const ciphertext = Buffer.from([0x01, 0x02, 0x00, 0xff, 0xfe, 0x7f, 0x10]);
+    expect(() => decryptCredential(ciphertext)).toThrow(/could not be decrypted/i);
+  });
+
+  it('throws on bytes that are not valid UTF-8', () => {
+    mockSafeStorage.isEncryptionAvailable.mockReturnValue(true);
+    mockSafeStorage.decryptString.mockImplementation(() => {
+      throw new Error('bad ciphertext');
+    });
+    // A lone continuation byte — decodes to U+FFFD, so re-encoding changes length.
+    expect(() => decryptCredential(Buffer.from([0x80, 0x81, 0x82]))).toThrow();
+  });
+
+  it('throws on an empty buffer rather than yielding an empty credential', () => {
+    mockSafeStorage.isEncryptionAvailable.mockReturnValue(true);
+    mockSafeStorage.decryptString.mockImplementation(() => {
+      throw new Error('bad ciphertext');
+    });
+    expect(() => decryptCredential(Buffer.alloc(0))).toThrow();
+  });
+
+  it('a successful decryption is unaffected', () => {
+    mockSafeStorage.isEncryptionAvailable.mockReturnValue(true);
+    mockSafeStorage.decryptString.mockReturnValue('secret');
+    expect(decryptCredential(Buffer.from('anything'))).toBe('secret');
+  });
+
+  describe('with no keyring at all', () => {
+    beforeEach(() => {
+      mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
+    });
+
+    it('reads plaintext, which is all the app could have written', () => {
+      expect(decryptCredential(Buffer.from('plain-user', 'utf-8'))).toBe('plain-user');
+    });
+
+    /**
+     * The realistic case: a profile encrypted on a machine that HAD a keyring,
+     * opened on one that does not. Returning the ciphertext as text would send
+     * binary to the provider; the user needs to be told to re-enter it.
+     */
+    it('throws on a blob that was encrypted elsewhere', () => {
+      const ciphertext = Buffer.from([0xde, 0xad, 0x00, 0xbe, 0xef]);
+      expect(() => decryptCredential(ciphertext)).toThrow(/could not be decrypted/i);
+    });
+  });
+});
