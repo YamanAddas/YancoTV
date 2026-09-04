@@ -3584,6 +3584,38 @@ half with the left half empty. MK.37.D covered Home's rails and hero but not the
 needs the same `usesCoverflow`-style split the browse screen got (one column when the lane is tall)
 and is its own slice.
 
+### MK.37.G — the detail page, and a rating spotted on the television — shipped 2026-09-04
+
+Found while verifying MK.37.F: `ContentDetailScreen` was still drawing the television's two-pane
+identity block in portrait. Its content started at **x=952 of a 1440 px screen**, pushed into the
+right-hand sliver with the left half empty. The arithmetic says exactly why — gutter 48 + poster 200
++ gap 24 = 272 dp, leaving the title column **91 dp of 411**.
+
+Poster **beside** the title on a wide lane, **above** it on a tall one, chosen on
+`ShellMetrics.usesCoverflow` — the same property the shell, the browse screen and the guide read. A
+single `DetailIdentity` wrapper takes the children either way, so the block cannot drift between the
+two shapes. Gutter, backdrop, content offset and poster all come off the metrics now.
+
+**A regression caught by arithmetic before it was ever read.** `detailHeroHeight` was added in
+MK.37.D as `windowHeight * 0.38` and nothing consumed it — which is the only reason it did not ship:
+on the Fire TV that gives **220 dp against the 330 the detail page has always drawn**, a third of the
+backdrop gone. A height-only fraction cannot reproduce a number chosen for a wide short screen. It
+now takes the smaller of `windowHeight * 0.61` (the television's own 330 of 540) and `lane * 0.56`
+(which stops a tall window handing the backdrop most of the fold — 230 dp on a phone rather than
+446). `detailPosterWidth` is `lane * 0.24` clamped, which lands the television exactly on its
+shipped 200 dp and gives a phone 120.
+
+**And a real bug spotted on the television while verifying this.** The detail page's meta line read
+`★ 0`. It was doing its own three wrong reads — the same three MK.36.4 fixed in the preview pane and
+never applied here: `releaseDate.take(4)` prints "01/0" for the `01/04/2023` rows providers also
+send; a movie with no `releaseDate` showed no year though 77% carry a `(YYYY)` in the title; and a
+provider writes "0" for "not rated", which rendered as a confident star-zero. It reads `rowFacts`
+now, like every other surface.
+
+Verified: Pixel XL portrait — content starts at **x=72**, title 787 px wide, actions spanning the
+full width, and no star-zero. Chromecast — content at x=535, which is gutter 43.4 + poster 200 +
+gap 24 in dp, so the side-by-side layout is preserved; 0 fatals.
+
 ### Remaining slices
 
 | Slice | Scope |

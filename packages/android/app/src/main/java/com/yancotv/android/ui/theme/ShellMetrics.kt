@@ -188,13 +188,39 @@ data class ShellMetrics(
     /** Grid tile for Favorites and Search results. */
     val gridTileWidth: Dp get() = (lane * 0.40f).coerceIn(140.dp, 220.dp)
 
-    /** Detail-page backdrop height, as a fraction of what the window can spare. */
+    /**
+     * Detail-page backdrop height.
+     *
+     * Bounded by **both** axes, like [heroHeight] and for the same reason. The
+     * first draft of this was `windowHeight * 0.38` and was never read by
+     * anything — which is the only reason it did not ship: on the Fire TV it
+     * gives **220 dp against the 330 the detail page has always drawn**, a third
+     * of the backdrop gone. A height-only fraction cannot reproduce a number
+     * that was chosen for a wide short screen.
+     *
+     * `windowHeight * 0.61` is the television's own 330 of 540. `lane * 0.56`
+     * is what stops a tall window handing the backdrop most of the fold —
+     * a 411 dp phone gets 230 dp rather than 446.
+     */
     val detailHeroHeight: Dp get() =
-        if (shortViewport) {
-            (windowHeight * 0.55f).coerceIn(180.dp, 300.dp)
-        } else {
-            (windowHeight * 0.38f).coerceIn(220.dp, ShellDim.heroHeight)
-        }
+        minOf(windowHeight * 0.61f, lane * 0.56f).coerceIn(200.dp, ShellDim.heroHeight)
+
+    /**
+     * How far the detail page's title block is pushed down so it lands in the
+     * dark band of the backdrop's gradient rather than over the bright middle.
+     * A fraction of the backdrop, so the two cannot drift apart.
+     */
+    val detailContentOffset: Dp get() = detailHeroHeight * 0.42f
+
+    /**
+     * Detail-page poster.
+     *
+     * The television's 200 dp is just under a quarter of its 868 dp lane; on a 411 dp phone the
+     * same constant is 49%, and with a 48 dp gutter either side it left the
+     * title column **91 dp** — which is what pushed the whole detail page into
+     * the right-hand sliver of the screen.
+     */
+    val detailPosterWidth: Dp get() = (lane * 0.24f).coerceIn(120.dp, ShellDim.detailPosterWidth)
 }
 
 /** Target edge for one browse-grid cell; the column count falls out of it. */

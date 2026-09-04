@@ -222,6 +222,41 @@ class ShellMetricsTest {
         assertTrue(metrics(200, 800).gridColumns >= 2)
     }
 
+    // ───── The detail page ─────
+
+    /**
+     * The regression this caught. A height-only fraction gave the Fire TV
+     * 220 dp against the 330 the detail page has always drawn — a third of the
+     * backdrop gone. Nothing read the property yet, which is the only reason it
+     * did not ship.
+     */
+    @Test
+    fun `detail backdrop keeps the television's own height`() {
+        val h = fireTv.detailHeroHeight
+        assertTrue("Fire TV detail backdrop was $h, shipped is 330.dp", h >= 320.dp && h <= 330.dp)
+    }
+
+    @Test
+    fun `detail backdrop does not swallow a tall window`() {
+        assertTrue(
+            "portrait backdrop ${phonePortrait.detailHeroHeight} of ${phonePortrait.windowHeight}",
+            phonePortrait.detailHeroHeight <= phonePortrait.windowHeight * 0.40f,
+        )
+    }
+
+    /**
+     * The 200 dp poster is 23% of the television's lane and 49% of a phone's.
+     * With a gutter either side that left the title column 91 dp, which is what
+     * pushed the detail page into the right-hand sliver of the screen.
+     */
+    @Test
+    fun `detail poster leaves the title column room on a phone`() {
+        val m = phonePortrait
+        val remaining = m.lane - m.pageInset * 2 - m.detailPosterWidth
+        assertTrue("title column had $remaining", remaining >= 200.dp)
+        assertEquals(ShellDim.detailPosterWidth, fireTv.detailPosterWidth)
+    }
+
     @Test
     fun `page inset never eats a small phone and never floats a large one`() {
         assertEquals(Space.lg, metrics(320, 568).pageInset)

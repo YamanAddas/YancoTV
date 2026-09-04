@@ -80,6 +80,7 @@ import com.yancotv.android.ui.focus.PlacedFocusAnchor
 import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
+import com.yancotv.android.ui.theme.LocalShellMetrics
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
@@ -87,6 +88,7 @@ import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentDetailService
+import com.yancotv.shared.content.rowFacts
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.EpisodeResumeInfo
 import com.yancotv.shared.history.WatchHistoryRepository
@@ -584,6 +586,23 @@ fun ContentDetailScreen(
     }
 }
 
+/**
+ * Poster and title block: side by side where there is width for both, stacked
+ * where there is not.
+ *
+ * A single wrapper rather than two copies of the children, so the identity
+ * block cannot drift between the two shapes — the failure the shell's own
+ * `ShellMetrics` rules exist to prevent.
+ */
+@Composable
+private fun DetailIdentity(sideBySide: Boolean, content: @Composable () -> Unit) {
+    if (sideBySide) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.xxl)) { content() }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(Space.lg)) { content() }
+    }
+}
+
 @Composable
 private fun HeroBlock(
     item: ContentItem,
@@ -603,20 +622,27 @@ private fun HeroBlock(
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
         BackdropHero(url = backdropUrlOf(item, metadata))
+        val shellMetrics = LocalShellMetrics.current
+        // MK.37.G — poster BESIDE the title on a wide lane, ABOVE it on a tall
+        // one. The television's row was being drawn on a phone, where a 48 dp
+        // gutter either side plus a 200 dp poster left the title column 91 dp of
+        // 411 — the whole page squeezed into the right-hand sliver. Same rule
+        // the browse screen and the guide read.
+        val sideBySide = shellMetrics.usesCoverflow
         Column(
             modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Space.page, vertical = Space.xxxl),
+                .padding(horizontal = shellMetrics.pageInset, vertical = Space.xxxl),
             verticalArrangement = Arrangement.spacedBy(Space.lg),
         ) {
             // Push the content block below the backdrop gradient so the
             // title sits in the darkest band where the scrim reads best.
-            Spacer(modifier = Modifier.height(ShellDim.detailHeroContentOffset))
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.xxl)) {
+            Spacer(modifier = Modifier.height(shellMetrics.detailContentOffset))
+            DetailIdentity(sideBySide = sideBySide) {
                 Poster(url = item.logoUrl ?: metadata.tmdbPosterUrl)
                 Column(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(Space.md),
                 ) {
                     if (!item.groupName.isNullOrBlank()) {
@@ -640,7 +666,7 @@ private fun HeroBlock(
                             style = YancoType.BodyLong,
                         )
                     }
-                    MetaLine(metadata, item.type, episodeCount = episodes.size)
+                    MetaLine(item, metadata, item.type, episodeCount = episodes.size)
                     metadata.plot?.takeIf { it.isNotBlank() }?.let {
                         Text(
                             text = it,
@@ -697,7 +723,10 @@ private fun BackdropHero(url: String?) {
         modifier =
         Modifier
             .fillMaxWidth()
-            .height(ShellDim.heroHeight)
+            // MK.37.G — sized from the window. 330 dp is 61% of a Fire TV's
+            // 540 dp fold and right there; on a 731 dp phone the same constant
+            // is a different picture entirely.
+            .height(LocalShellMetrics.current.detailHeroHeight)
             .background(LocalYancoPalette.current.BackgroundRaised),
     ) {
         if (!url.isNullOrBlank()) {
@@ -749,7 +778,9 @@ private fun Poster(url: String?) {
     Box(
         modifier =
         Modifier
-            .width(ShellDim.detailPosterWidth)
+            // MK.37.G — 200 dp is just under a quarter of the television's
+            // lane and half a phone's, which is what starved the title column.
+            .width(LocalShellMetrics.current.detailPosterWidth)
             .aspectRatio(ShellDim.posterAspect)
             .clip(RoundedCornerShape(Radius.panel))
             .background(LocalYancoPalette.current.BackgroundRaised)
@@ -779,11 +810,19 @@ private fun Poster(url: String?) {
 }
 
 @Composable
-private fun MetaLine(meta: ContentMetadata, type: ContentType, episodeCount: Int) {
+private fun MetaLine(item: ContentItem, meta: ContentMetadata, type: ContentType, episodeCount: Int) {
+    // MK.37.G \u2014 year and rating come from `rowFacts`, the same source the browse
+    // orb and the preview pane have read since MK.36.4. This line was still
+    // doing its own three wrong reads: `releaseDate.take(4)` prints "01/0" for
+    // the `01/04/2023` rows providers also send; a movie with no `releaseDate`
+    // showed no year though 77% carry a `(YYYY)` in the title; and a provider
+    // writes "0" for "not rated", which rendered here as a confident star-zero.
+    // Spotted on the television while verifying this very slice.
+    val row = remember(item.id, item.metadataJson) { rowFacts(listOf(item)).firstOrNull() }
     val bits =
         buildList {
-            meta.releaseDate?.takeIf { it.isNotBlank() }?.let { add(it.take(4)) }
-            meta.rating?.takeIf { it.isNotBlank() }?.let { add("\u2605 $it") }
+            row?.year?.let { add(it.toString()) }
+            row?.rating?.let { add("\u2605 " + String.format(java.util.Locale.getDefault(), "%.1f", it)) }
             meta.genre?.takeIf { it.isNotBlank() }?.let { add(it) }
             meta.duration?.takeIf { it.isNotBlank() }?.let { add(it) }
             if (type == ContentType.SERIES && episodeCount > 0) add("$episodeCount episodes")
