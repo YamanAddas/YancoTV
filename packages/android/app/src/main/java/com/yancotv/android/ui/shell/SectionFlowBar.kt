@@ -99,7 +99,22 @@ fun SectionFlowBar(
     // opens a sheet rather than a screen, but it must not feel bolted on the end.
     val slots = items.size + 1
 
-    val selectedIndex = items.indexOf(current).coerceAtLeast(0).toFloat()
+    // MK.37.H.2 — an overflow destination parks the indicator on the More
+    // slot, not wherever it happened to be.
+    //
+    // `indexOf` returns -1 for Guide / Recordings / Search / Settings because
+    // none of them is in the bar, and the old `coerceAtLeast(0)` turned that
+    // into Home. The `LaunchedEffect` below then declined to move because
+    // `items.contains(current)` was false, so the marker simply stayed where it
+    // last was — sitting under whichever tab you pressed before More, while the
+    // screen showed Settings. The bar was pointing at the wrong place.
+    val overflowSlot = items.size
+    val selectedIndex =
+        if (current in AppSection.compactOverflow) {
+            overflowSlot.toFloat()
+        } else {
+            items.indexOf(current).coerceAtLeast(0).toFloat()
+        }
     // Continuous position of the indicator, in slot indices. Fractional while a
     // finger is dragging, which is what lets the whole row respond rather than
     // two cells swapping states.
@@ -110,7 +125,10 @@ fun SectionFlowBar(
     // Keeps the indicator honest when the section changes from somewhere else —
     // the overflow sheet, a deep link, the parental gate bouncing off Settings.
     LaunchedEffect(current) {
-        if (!dragging && items.contains(current)) focus.animateTo(selectedIndex, travel())
+        // No `items.contains` guard: an overflow destination has a slot too —
+        // the More one — and refusing to move for it is what left the marker
+        // stranded on the previous tab.
+        if (!dragging) focus.animateTo(selectedIndex, travel())
     }
 
     Box(
@@ -139,12 +157,13 @@ fun SectionFlowBar(
             fun commit(index: Int) {
                 if (index >= items.size) {
                     onOpenOverflow()
-                    // The sheet is not a destination, so the indicator returns
-                    // to wherever the viewer actually is once it is dismissed.
-                    scope.launch {
-                        focus.animateTo(index.toFloat(), travel())
-                        focus.animateTo(selectedIndex, travel())
-                    }
+                    // Travel to the More slot and STAY there while the sheet is
+                    // open. It used to bounce straight back, which read as the
+                    // press being rejected — and it was the only visible
+                    // response at all while the sheet was going unrendered
+                    // (MK.37.H.1). If the viewer dismisses without choosing,
+                    // the `LaunchedEffect` above returns it to the real section.
+                    scope.launch { focus.animateTo(index.toFloat(), travel()) }
                 } else {
                     scope.launch { focus.animateTo(index.toFloat(), travel()) }
                     onSelect(items[index])

@@ -3689,6 +3689,34 @@ Settings); choosing Settings navigates there and dismisses the sheet; BACK dismi
 the app on Home. Fire TV and Chromecast both reach the shell with no bottom bar composed at all,
 0 fatals.
 
+### MK.37.H.2 — the bar pointed at the wrong tab in an overflow section — shipped 2026-09-04
+
+With Settings (or Guide / Recordings / Search) on screen, the bar's hexagon sat under whichever tab
+had been pressed *before* More. The bar was pointing at a place the viewer was not.
+
+`items.indexOf(current)` returns -1 for the four overflow destinations, because none of them is in
+the bar, and `coerceAtLeast(0)` turned that into **Home**. The settle effect then declined to move
+at all — it was guarded on `items.contains(current)`, false for exactly these sections — so the
+marker simply stayed where it last was. Both halves had to be wrong for the bug to appear, which is
+why it survived MK.37.B's device pass.
+
+The overflow destinations now resolve to the More slot, and the settle effect has no `contains`
+guard: an overflow section *has* a slot, and refusing to move for it is what stranded the marker.
+
+`commit()` also stops bouncing. Tapping More used to run the hexagon out and immediately back, which
+reads as the press being rejected — and while the sheet was going unrendered (MK.37.H.1) that bounce
+was the *only* response the press produced. It now travels to More and stays; if the sheet is
+dismissed without a choice, the settle effect returns it to the real section.
+
+Verified on the Pixel XL by isolating each half: tapping More moves the marker to More and it stays;
+tapping Movies moves it to Movies (so the animation itself was never at fault); and with Settings
+open the lifted cell is **More**. Fire TV and Chromecast compose no bottom bar at all, 0 fatals.
+
+**A verification note worth keeping.** The first run of this fix reported failure, and the fix was
+fine — `./gradlew` had been invoked from the repo root, where it does not exist, so the command
+failed silently and a **stale APK** was installed and measured. A build step that produces no
+`BUILD SUCCESSFUL` line is not a build; grep for it rather than trusting the install that follows.
+
 ### Remaining slices
 
 | Slice | Scope |
