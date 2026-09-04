@@ -2955,12 +2955,13 @@ class PlayerActivity : AppCompatActivity() {
                 longPressFired = false
                 return true
             }
-            val isLive = controller.currentItem.value?.type == ContentType.LIVE
-            if (isLive) {
-                playerView.showController()
-            } else {
-                if (!dockVisible) showVodDock() else hideVodDock()
-            }
+            // MK.38 — one surface. This branched on content type and called
+            // showController() for live, which is a silent no-op now that
+            // useController is false: the press produced nothing at all.
+            // Grepping `controllerVisible` did not find this site, because it
+            // branches on ContentType instead — which is why the device pass
+            // caught it and the unit tests could not.
+            if (!dockVisible) showVodDock() else hideVodDock()
             return true
         }
         // Repeats while held — consume so PlayerView doesn't act on them.
@@ -3266,27 +3267,13 @@ class PlayerActivity : AppCompatActivity() {
                 showOptionsV2()
                 return true
             }
-            // OK / ENTER toggles the control surface. LIVE keeps Media3's
-            // built-in PlayerControlView (zap bar + program-progress ride
-            // alongside it); VOD surfaces the Compose dock
-            // (MK.16.player.vod.dock). `useController` is set per item in
-            // onItemChanged so a single `showController()` call on LIVE is
-            // sufficient — for VOD PlayerView ignores it anyway.
+            // MK.38 — OK / ENTER toggles the one control surface, for live and
+            // VOD alike. This used to send live to Media3's built-in
+            // PlayerControlView because the zap bar and programme row rode
+            // alongside it; they ride with the dock now.
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                val isLive = controller.currentItem.value?.type == ContentType.LIVE
-                if (isLive) {
-                    if (!controllerVisible) {
-                        playerView.showController()
-                        return true
-                    }
-                } else {
-                    if (!dockVisible) {
-                        showVodDock()
-                    } else {
-                        hideVodDock()
-                    }
-                    return true
-                }
+                if (!dockVisible) showVodDock() else hideVodDock()
+                return true
             }
             KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE -> {
                 toggleQuickInfo()
