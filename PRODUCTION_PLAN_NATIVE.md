@@ -3962,9 +3962,17 @@ Then the same phone with only the measurement removed (one line, `fit.shown` bac
 | FIT, FAV | **absent from the tree** |
 | **MENU** | **`[0,0][0,0]`** |
 
-So on a phone in portrait the ⋯ control was a zero-size node: not clipped, not small — gone, and with
-it the only route to Audio, Speed, Aspect and Favourites. There was no workaround, and nothing in
-the tree said anything was missing.
+So on a phone in portrait the ⋯ control was a zero-size node: not clipped, not small — gone, along
+with three of the controls it exists to stand in for, and nothing in the tree said so.
+
+**One correction to an earlier draft of this paragraph, which overstated it.** A phone was not
+stranded: `updatePlayerChrome` puts a *More options* button in the player's top bar on phones, and
+it opens the same options root, so Audio / Speed / Aspect / Favourites remained reachable — just not
+from the dock, and not by any route the dock suggested. The claim that there was "no workaround" was
+wrong, and the dump that proved the bug also showed `More options` sitting at `[1034,70][1202,238]`
+in the same frame. On a television the top bar is hidden and there would have been no second route —
+but on a television the row fits, so the case never arises. What the bug actually cost is the dock's
+own promise: five controls advertised, four of them silently not there.
 
 **Also seen on glass, at a size the dock cannot fit.** `wm size 1280x720` on the Google TV (reset
 immediately after) rendered: `-10`, play, `+10`, NEXT, `⋯` — all five secondaries dropped, the
