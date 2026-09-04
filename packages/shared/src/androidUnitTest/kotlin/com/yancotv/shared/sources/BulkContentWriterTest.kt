@@ -1252,16 +1252,15 @@ class BulkContentWriterTest {
     }
 
     /** Direct `content_fts` row count — see the note at its call site. */
-    private fun ftsRowCount(driver: app.cash.sqldelight.db.SqlDriver): Long =
-        driver.executeQuery(
-            null,
-            "SELECT COUNT(*) FROM content_fts",
-            { cursor ->
-                cursor.next()
-                app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0) ?: 0L)
-            },
-            0,
-        ).value
+    private fun ftsRowCount(driver: app.cash.sqldelight.db.SqlDriver): Long = driver.executeQuery(
+        null,
+        "SELECT COUNT(*) FROM content_fts",
+        { cursor ->
+            cursor.next()
+            app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0) ?: 0L)
+        },
+        0,
+    ).value
 
     /**
      * Counts the two DELETE shapes the clear issues, so MB-402's claim can be
@@ -1269,9 +1268,7 @@ class BulkContentWriterTest {
      * method this test does not care about keeps its real behaviour and new
      * SqlDriver members do not silently become no-ops.
      */
-    private class CountingDriver(
-        private val delegate: app.cash.sqldelight.db.SqlDriver,
-    ) : app.cash.sqldelight.db.SqlDriver by delegate {
+    private class CountingDriver(private val delegate: app.cash.sqldelight.db.SqlDriver) : app.cash.sqldelight.db.SqlDriver by delegate {
         var ftsDeletes = 0
             private set
         var contentDeletes = 0

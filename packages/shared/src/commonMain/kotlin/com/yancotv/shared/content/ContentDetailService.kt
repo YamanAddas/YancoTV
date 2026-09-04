@@ -6,8 +6,8 @@ import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.sources.SourceRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentMetadata
-import com.yancotv.shared.types.DETAIL_SCHEMA
 import com.yancotv.shared.types.ContentType
+import com.yancotv.shared.types.DETAIL_SCHEMA
 import com.yancotv.shared.types.EpisodeInfo
 import com.yancotv.shared.types.Result
 import com.yancotv.shared.types.SubtitleTrack
@@ -57,12 +57,7 @@ class ContentDetailService(
      * that itself: this class has no scope, and inventing one would make a
      * detail read outlive the screen that asked for it.
      */
-    data class Loaded(
-        val item: ContentItem,
-        val metadata: ContentMetadata,
-        val episodes: List<EpisodeInfo>,
-        val refreshInBackground: Boolean = false,
-    )
+    data class Loaded(val item: ContentItem, val metadata: ContentMetadata, val episodes: List<EpisodeInfo>, val refreshInBackground: Boolean = false)
 
     /**
      * Whether a cached blob is worth going back to the provider for.
@@ -86,12 +81,11 @@ class ContentDetailService(
     }
 
     /** Nothing worth rendering is cached — this fetch has to be waited for. */
-    private fun isMissingEssentials(type: ContentType, cached: ContentMetadata): Boolean =
-        when (type) {
-            ContentType.MOVIE -> cached.plot.isNullOrBlank()
-            ContentType.SERIES -> cached.episodes.isNullOrEmpty()
-            else -> false
-        }
+    private fun isMissingEssentials(type: ContentType, cached: ContentMetadata): Boolean = when (type) {
+        ContentType.MOVIE -> cached.plot.isNullOrBlank()
+        ContentType.SERIES -> cached.episodes.isNullOrEmpty()
+        else -> false
+    }
 
     /**
      * Whether an old blob is missing something *this* type now renders.

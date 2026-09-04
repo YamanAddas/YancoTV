@@ -1,6 +1,5 @@
 package com.yancotv.shared.playback
 
-
 /**
  * MB-343 — the up-next card's visibility window.
  *

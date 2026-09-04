@@ -292,10 +292,7 @@ class BackupImporter(
      * carries no user intent beyond its timestamp, and a restore should not
      * make the list *older* than what is already on the device.
      */
-    private fun importRecentChannels(
-        records: List<RecentChannelRecord>,
-        skipped: MutableMap<String, Int>,
-    ): Int {
+    private fun importRecentChannels(records: List<RecentChannelRecord>, skipped: MutableMap<String, Int>): Int {
         var written = 0
         for (r in records) {
             val existing = db.recentChannelsQueries

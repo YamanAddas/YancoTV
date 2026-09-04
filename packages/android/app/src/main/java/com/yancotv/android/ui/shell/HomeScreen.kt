@@ -8,10 +8,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -388,529 +388,529 @@ fun HomeScreen(
     // it was. Screens adopt `LocalShellMetrics` one at a time from MK.37.B,
     // each with its own TV pass.
     CompositionLocalProvider(LocalShellMetrics provides rememberShellMetrics()) {
-    if (!shellReady) {
-        BrandSplash()
-        return@CompositionLocalProvider
-    }
-    val shellMetrics = LocalShellMetrics.current
-    val usesSidebar = shellMetrics.usesSidebar
-    var showOverflow by rememberSaveable { mutableStateOf(false) }
+        if (!shellReady) {
+            BrandSplash()
+            return@CompositionLocalProvider
+        }
+        val shellMetrics = LocalShellMetrics.current
+        val usesSidebar = shellMetrics.usesSidebar
+        var showOverflow by rememberSaveable { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        CinematicBackground(modifier = Modifier.fillMaxSize())
-        // MK.37.B — the existing Row is untouched and simply gains a Column
-        // around it, so the television takes a single weighted child and lays
-        // out exactly as before. On a phone in portrait the rail is dropped and
-        // the bar is appended; nothing in between changes.
-        Column(modifier = Modifier.fillMaxSize()) {
-        // MK.28.1 — the background above stays full-bleed under the
-        // transparent system bars; every interactive child is inset by
-        // safeDrawing (system bars + display cutout + IME). Zero on TV.
-        //
-        // MK.37.B — when the bar is present it owns the BOTTOM inset, so the
-        // content above must not consume it too; otherwise the bar floats above
-        // a stripe of background instead of running under the gesture bar.
-        Row(
-            modifier =
-            Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .windowInsetsPadding(
-                    if (usesSidebar) {
-                        WindowInsets.safeDrawing
-                    } else {
-                        WindowInsets.safeDrawing.only(
-                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
-                        )
-                    },
-                ),
-        ) {
-            if (usesSidebar) {
-            AppSidebar(
-                current = section,
-                onSelect = { newSection ->
-                    // Click on a sidebar tab does TWO things:
-                    //   1. Switch section (no-op if same).
-                    //   2. Always navigate INTO the section — clicking the
-                    //      current tab while focused on sidebar must still
-                    //      pull focus to that section's content. Without
-                    //      step 2, clicking your already-active tab is a
-                    //      dead press, which is what the user hit.
-                    // For browse sections, BrowseSection's PlacedFocusAnchor
-                    // lands focus on the active pill once it's placed.
-                    section = newSection
-                    // Guide also has a CategoryRail (MK.guide.groups), so
-                    // treat it like the browse sections: forward into
-                    // Categories, not Content. GuideScreen's
-                    // LaunchedEffect(panelFocus) lands focus on the rail.
-                    if (newSection.contentType != null || newSection == AppSection.Guide) {
-                        panelFocus = PanelFocus.Categories
-                    } else {
-                        panelFocus = PanelFocus.Content
-                        // One frame so the section's content composable has
-                        // mounted before we try to focus it (esp. when
-                        // section actually changed and the old composable
-                        // just left composition).
-                        homeScope.launch {
-                            withFrameNanos { }
-                            runCatching { mainContentFocus.requestFocus() }
-                        }
-                    }
-                },
-                // Direct focus binding: expanded ⇔ sidebar has focus.
-                // The previous binding routed through `panelFocus`, which
-                // had to be kept in sync from multiple call sites
-                // (LaunchedEffects + onSelect + onMoveRight + browse-section
-                // callbacks). Any path that didn't update panelFocus left
-                // the sidebar at the wrong width — most visibly when
-                // returning from a content pane via BACK / LEFT, where the
-                // focus animation finished but the panelFocus update lagged.
-                // Tying width straight to `sidebarHasFocus` makes the
-                // contract obvious: focus enters → expand; focus leaves →
-                // collapse. The `panelFocus` state is still used elsewhere
-                // (categories/content gating in browse + guide), so we keep
-                // it but stop using it as the width signal.
-                expanded = sidebarHasFocus,
-                onMoveRight = {
-                    // RIGHT mirrors click — both navigate into the section.
-                    // Browse sections (Live/Movies/Series) advance to the
-                    // categories rail; non-browse sections jump straight
-                    // into their content. The sidebar collapses to icon-only
-                    // because expanded = (panelFocus == Sidebar).
-                    if (contentType != null || section == AppSection.Guide) {
-                        panelFocus = PanelFocus.Categories
-                    } else {
-                        panelFocus = PanelFocus.Content
-                        homeScope.launch {
-                            withFrameNanos { }
-                            runCatching { mainContentFocus.requestFocus() }
-                        }
-                    }
-                },
-                // MB-106: requester binds to the active SidebarRow inside
-                // AppSidebar (not the wrapper Column) so BACK / detail-close
-                // / onExitToSidebar land focus on the row directly — no
-                // need for the user to nudge the D-pad to "wake up" the
-                // selector. focusRestorer on the wrapper kept misfiring
-                // because requestFocus on the wrapper required a child
-                // discovery pass before the row's interactionSource flipped.
-                activeRowFocus = sidebarFocus,
-                modifier = Modifier.onFocusChanged { sidebarHasFocus = it.hasFocus },
-            )
-            }
-
-            if (contentType != null) {
-                // Concept A — Live TV / Movies / Series share the cascading
-                // sidebar→categories→content shell. CategoryRail (vertical
-                // hex pills) drives selection; the coverflow + preview pane
-                // live in CoverflowSectionScreen.
+        Box(modifier = Modifier.fillMaxSize()) {
+            CinematicBackground(modifier = Modifier.fillMaxSize())
+            // MK.37.B — the existing Row is untouched and simply gains a Column
+            // around it, so the television takes a single weighted child and lays
+            // out exactly as before. On a phone in portrait the rail is dropped and
+            // the bar is appended; nothing in between changes.
+            Column(modifier = Modifier.fillMaxSize()) {
+                // MK.28.1 — the background above stays full-bleed under the
+                // transparent system bars; every interactive child is inset by
+                // safeDrawing (system bars + display cutout + IME). Zero on TV.
                 //
-                // key(contentType) forces a complete unmount/remount on
-                // every type swap. All `remember` / `rememberSaveable` /
-                // PlacedFocusAnchor / FocusRequester instances inside
-                // BrowseSection are guaranteed fresh — no anchor reused
-                // across types (was firing requestFocus on the wrong
-                // node), no stale selectedGroup leaking, no items list
-                // bleeding the previous type's content into the new
-                // section's coverflow during the recompose window.
-                key(contentType) {
-                    BrowseSection(
-                        type = contentType,
-                        panelFocus = panelFocus,
-                        onPanelFocusChanged = { panelFocus = it },
-                        onActivate = onBrowseActivate,
-                        onPlayNow = onBrowsePlayNow,
-                        onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
-                        restoreFocusOnWindowRegain =
-                        detailItem == null && !searchOverlayVisible && pendingPlay == null,
-                        // Same path as HomeContent.onAddSource — surfaces
-                        // when the coverflow empty pane is rendered.
-                        onAddSource = {
-                            pendingSettingsTab = com.yancotv.android.ui.settings.SettingsTab.Sources
-                            section = AppSection.Settings
-                        },
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
-                }
-            } else if (section == AppSection.Settings) {
-                // MB-111: .focusGroup() makes each non-browse content Box a
-                // deterministic descendant-focus search root. Without it,
-                // `mainContentFocus.requestFocus()` on a bare wrapper Box can
-                // silently fail on Compose 1.7 when the first focusable child
-                // isn't placed yet — the search bails instead of waiting. The
-                // group flag tells Compose "this wrapper owns focus search for
-                // its subtree" so the request reliably forwards to the next
-                // focusable child once placed. Same pattern repeats below for
-                // Guide / Favorites / Search / Home.
-                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
-                    if (needsSettingsGate) {
-                        SettingsLockedPlaceholder()
-                    } else {
-                        // Audit catch — when the user has zero sources
-                        // configured and opens Settings (via sidebar or
-                        // any path other than the EmptyHome CTA), default
-                        // to Sources rather than General. Sources is the
-                        // one tab they actually need to make the app
-                        // useful. Returning users with ≥1 source still
-                        // land on General. The EmptyHome CTA path
-                        // already wins via pendingSettingsTab.
-                        val hasSources by remember {
-                            sources.allFlow()
-                                .map { it.isNotEmpty() }
-                                .catch { emit(true) }
-                        }.collectAsState(initial = true)
-                        SettingsScreen(
-                            initialTab = pendingSettingsTab
-                                ?: if (hasSources) {
-                                    com.yancotv.android.ui.settings.SettingsTab.General
-                                } else {
-                                    com.yancotv.android.ui.settings.SettingsTab.Sources
-                                },
-                            onExitToMainSidebar = {
-                                runCatching { sidebarFocus.requestFocus() }
+                // MK.37.B — when the bar is present it owns the BOTTOM inset, so the
+                // content above must not consume it too; otherwise the bar floats above
+                // a stripe of background instead of running under the gesture bar.
+                Row(
+                    modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .windowInsetsPadding(
+                            if (usesSidebar) {
+                                WindowInsets.safeDrawing
+                            } else {
+                                WindowInsets.safeDrawing.only(
+                                    WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                                )
                             },
+                        ),
+                ) {
+                    if (usesSidebar) {
+                        AppSidebar(
+                            current = section,
+                            onSelect = { newSection ->
+                                // Click on a sidebar tab does TWO things:
+                                //   1. Switch section (no-op if same).
+                                //   2. Always navigate INTO the section — clicking the
+                                //      current tab while focused on sidebar must still
+                                //      pull focus to that section's content. Without
+                                //      step 2, clicking your already-active tab is a
+                                //      dead press, which is what the user hit.
+                                // For browse sections, BrowseSection's PlacedFocusAnchor
+                                // lands focus on the active pill once it's placed.
+                                section = newSection
+                                // Guide also has a CategoryRail (MK.guide.groups), so
+                                // treat it like the browse sections: forward into
+                                // Categories, not Content. GuideScreen's
+                                // LaunchedEffect(panelFocus) lands focus on the rail.
+                                if (newSection.contentType != null || newSection == AppSection.Guide) {
+                                    panelFocus = PanelFocus.Categories
+                                } else {
+                                    panelFocus = PanelFocus.Content
+                                    // One frame so the section's content composable has
+                                    // mounted before we try to focus it (esp. when
+                                    // section actually changed and the old composable
+                                    // just left composition).
+                                    homeScope.launch {
+                                        withFrameNanos { }
+                                        runCatching { mainContentFocus.requestFocus() }
+                                    }
+                                }
+                            },
+                            // Direct focus binding: expanded ⇔ sidebar has focus.
+                            // The previous binding routed through `panelFocus`, which
+                            // had to be kept in sync from multiple call sites
+                            // (LaunchedEffects + onSelect + onMoveRight + browse-section
+                            // callbacks). Any path that didn't update panelFocus left
+                            // the sidebar at the wrong width — most visibly when
+                            // returning from a content pane via BACK / LEFT, where the
+                            // focus animation finished but the panelFocus update lagged.
+                            // Tying width straight to `sidebarHasFocus` makes the
+                            // contract obvious: focus enters → expand; focus leaves →
+                            // collapse. The `panelFocus` state is still used elsewhere
+                            // (categories/content gating in browse + guide), so we keep
+                            // it but stop using it as the width signal.
+                            expanded = sidebarHasFocus,
+                            onMoveRight = {
+                                // RIGHT mirrors click — both navigate into the section.
+                                // Browse sections (Live/Movies/Series) advance to the
+                                // categories rail; non-browse sections jump straight
+                                // into their content. The sidebar collapses to icon-only
+                                // because expanded = (panelFocus == Sidebar).
+                                if (contentType != null || section == AppSection.Guide) {
+                                    panelFocus = PanelFocus.Categories
+                                } else {
+                                    panelFocus = PanelFocus.Content
+                                    homeScope.launch {
+                                        withFrameNanos { }
+                                        runCatching { mainContentFocus.requestFocus() }
+                                    }
+                                }
+                            },
+                            // MB-106: requester binds to the active SidebarRow inside
+                            // AppSidebar (not the wrapper Column) so BACK / detail-close
+                            // / onExitToSidebar land focus on the row directly — no
+                            // need for the user to nudge the D-pad to "wake up" the
+                            // selector. focusRestorer on the wrapper kept misfiring
+                            // because requestFocus on the wrapper required a child
+                            // discovery pass before the row's interactionSource flipped.
+                            activeRowFocus = sidebarFocus,
+                            modifier = Modifier.onFocusChanged { sidebarHasFocus = it.hasFocus },
                         )
                     }
-                }
-            } else if (section == AppSection.Guide) {
-                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
-                    GuideScreen(
-                        panelFocus = panelFocus,
-                        onPanelFocusChanged = { panelFocus = it },
-                        onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
-                        onPlay = { channel, _ ->
-                            val item = guideChannelToContentItem(channel) ?: return@GuideScreen
-                            gatedPlay(item.id) {
-                                if (controller.currentId != item.id) {
-                                    controller.play(listOf(item), 0)
-                                }
-                                PlayerLauncher.launch(context)
+
+                    if (contentType != null) {
+                        // Concept A — Live TV / Movies / Series share the cascading
+                        // sidebar→categories→content shell. CategoryRail (vertical
+                        // hex pills) drives selection; the coverflow + preview pane
+                        // live in CoverflowSectionScreen.
+                        //
+                        // key(contentType) forces a complete unmount/remount on
+                        // every type swap. All `remember` / `rememberSaveable` /
+                        // PlacedFocusAnchor / FocusRequester instances inside
+                        // BrowseSection are guaranteed fresh — no anchor reused
+                        // across types (was firing requestFocus on the wrong
+                        // node), no stale selectedGroup leaking, no items list
+                        // bleeding the previous type's content into the new
+                        // section's coverflow during the recompose window.
+                        key(contentType) {
+                            BrowseSection(
+                                type = contentType,
+                                panelFocus = panelFocus,
+                                onPanelFocusChanged = { panelFocus = it },
+                                onActivate = onBrowseActivate,
+                                onPlayNow = onBrowsePlayNow,
+                                onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
+                                restoreFocusOnWindowRegain =
+                                detailItem == null && !searchOverlayVisible && pendingPlay == null,
+                                // Same path as HomeContent.onAddSource — surfaces
+                                // when the coverflow empty pane is rendered.
+                                onAddSource = {
+                                    pendingSettingsTab = com.yancotv.android.ui.settings.SettingsTab.Sources
+                                    section = AppSection.Settings
+                                },
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                            )
+                        }
+                    } else if (section == AppSection.Settings) {
+                        // MB-111: .focusGroup() makes each non-browse content Box a
+                        // deterministic descendant-focus search root. Without it,
+                        // `mainContentFocus.requestFocus()` on a bare wrapper Box can
+                        // silently fail on Compose 1.7 when the first focusable child
+                        // isn't placed yet — the search bails instead of waiting. The
+                        // group flag tells Compose "this wrapper owns focus search for
+                        // its subtree" so the request reliably forwards to the next
+                        // focusable child once placed. Same pattern repeats below for
+                        // Guide / Favorites / Search / Home.
+                        Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
+                            if (needsSettingsGate) {
+                                SettingsLockedPlaceholder()
+                            } else {
+                                // Audit catch — when the user has zero sources
+                                // configured and opens Settings (via sidebar or
+                                // any path other than the EmptyHome CTA), default
+                                // to Sources rather than General. Sources is the
+                                // one tab they actually need to make the app
+                                // useful. Returning users with ≥1 source still
+                                // land on General. The EmptyHome CTA path
+                                // already wins via pendingSettingsTab.
+                                val hasSources by remember {
+                                    sources.allFlow()
+                                        .map { it.isNotEmpty() }
+                                        .catch { emit(true) }
+                                }.collectAsState(initial = true)
+                                SettingsScreen(
+                                    initialTab = pendingSettingsTab
+                                        ?: if (hasSources) {
+                                            com.yancotv.android.ui.settings.SettingsTab.General
+                                        } else {
+                                            com.yancotv.android.ui.settings.SettingsTab.Sources
+                                        },
+                                    onExitToMainSidebar = {
+                                        runCatching { sidebarFocus.requestFocus() }
+                                    },
+                                )
                             }
-                        },
-                        onPlayCatchup = { item ->
-                            val underlying = item.id.removePrefix("catchup:").substringBefore(':')
-                            gatedPlay(underlying) {
-                                if (controller.currentId != item.id) {
-                                    controller.play(listOf(item), 0)
-                                }
-                                PlayerLauncher.launch(context)
-                            }
-                        },
-                    )
-                }
-            } else if (section == AppSection.Favorites) {
-                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
-                    FavoritesScreen(
-                        isTv = isTv,
-                        onOpenDetail = { item -> openDetail(item) },
-                    )
-                }
-            } else if (section == AppSection.Recordings) {
-                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
-                    com.yancotv.android.ui.shell.RecordingsScreen(isTv = isTv)
-                }
-            } else if (section == AppSection.Search) {
-                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
-                    SearchScreen(isTv = isTv, onShowDetail = { openDetail(it) })
-                }
-            } else if (section == AppSection.Home) {
-                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
-                    HomeContent(
-                        // MK.32.4 — Empty-Home Quick Start CTA. Switches
-                        // the active section to Settings and asks the
-                        // shell to open Settings on the Sources tab
-                        // (instead of the default General).
-                        onAddSource = {
-                            pendingSettingsTab = com.yancotv.android.ui.settings.SettingsTab.Sources
-                            section = AppSection.Settings
-                        },
-                        onPlay = { list, idx, resumeEpisodeId ->
-                            val target = list.getOrNull(idx) ?: return@HomeContent
-                            gatedPlay(target.id) {
-                                when (target.type) {
-                                    ContentType.LIVE, ContentType.MOVIE -> {
-                                        if (controller.currentId != target.id) controller.play(list, idx)
+                        }
+                    } else if (section == AppSection.Guide) {
+                        Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
+                            GuideScreen(
+                                panelFocus = panelFocus,
+                                onPanelFocusChanged = { panelFocus = it },
+                                onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
+                                onPlay = { channel, _ ->
+                                    val item = guideChannelToContentItem(channel) ?: return@GuideScreen
+                                    gatedPlay(item.id) {
+                                        if (controller.currentId != item.id) {
+                                            controller.play(listOf(item), 0)
+                                        }
                                         PlayerLauncher.launch(context)
                                     }
-                                    ContentType.SERIES -> {
-                                        // Continue Watching path. The episode the
-                                        // user gets depends on the most-recent
-                                        // watch_history row's state:
-                                        //   - No history → open detail page so the
-                                        //     user can pick (matches "first visit"
-                                        //     UX).
-                                        //   - Mid-stream → resume that episode at
-                                        //     its stored offset.
-                                        //   - Finished (≥95% per `isFinished()`) →
-                                        //     advance to the next episode in the
-                                        //     series. If no next episode (end of
-                                        //     series), restart the last one from 0.
-                                        // The "finished → next" routing is the
-                                        // Netflix-style behavior; without it,
-                                        // tapping a binge-watched series re-plays
-                                        // the just-finished episode, which is what
-                                        // the loop bug was masking.
-                                        if (resumeEpisodeId == null) {
-                                            openDetail(target)
-                                            return@gatedPlay
+                                },
+                                onPlayCatchup = { item ->
+                                    val underlying = item.id.removePrefix("catchup:").substringBefore(':')
+                                    gatedPlay(underlying) {
+                                        if (controller.currentId != item.id) {
+                                            controller.play(listOf(item), 0)
                                         }
-                                        homeScope.launch(Dispatchers.IO) {
-                                            val resumeInfo =
-                                                runCatching {
-                                                    history.mostRecentEpisode(target.id)
-                                                }.getOrNull()
-                                            val (episode, fromStart) =
-                                                if (resumeInfo != null && resumeInfo.isFinished()) {
-                                                    val next =
-                                                        runCatching {
-                                                            repo.nextEpisodeAfter(
-                                                                seriesId = target.id,
-                                                                currentEpisodeId = resumeInfo.episodeId,
-                                                            )
-                                                        }.getOrNull()
-                                                    if (next != null) {
-                                                        next to false
-                                                    } else {
-                                                        // End of series — restart the last
-                                                        // watched episode from 0. positionForEpisode
-                                                        // returns null on finished rows so the
-                                                        // setMediaItem path already skips the
-                                                        // seek; fromStart=true is belt-and-
-                                                        // suspenders.
-                                                        val last =
-                                                            runCatching {
-                                                                repo.episodeById(resumeInfo.episodeId)
-                                                            }.getOrNull()
-                                                        last to true
-                                                    }
-                                                } else {
-                                                    val ep =
-                                                        runCatching {
-                                                            repo.episodeById(resumeEpisodeId)
-                                                        }.getOrNull()
-                                                    ep to false
-                                                }
-                                            val playable = episode?.toPlayable(target)
-                                            withContext(Dispatchers.Main) {
-                                                if (playable == null) {
+                                        PlayerLauncher.launch(context)
+                                    }
+                                },
+                            )
+                        }
+                    } else if (section == AppSection.Favorites) {
+                        Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
+                            FavoritesScreen(
+                                isTv = isTv,
+                                onOpenDetail = { item -> openDetail(item) },
+                            )
+                        }
+                    } else if (section == AppSection.Recordings) {
+                        Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
+                            com.yancotv.android.ui.shell.RecordingsScreen(isTv = isTv)
+                        }
+                    } else if (section == AppSection.Search) {
+                        Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
+                            SearchScreen(isTv = isTv, onShowDetail = { openDetail(it) })
+                        }
+                    } else if (section == AppSection.Home) {
+                        Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
+                            HomeContent(
+                                // MK.32.4 — Empty-Home Quick Start CTA. Switches
+                                // the active section to Settings and asks the
+                                // shell to open Settings on the Sources tab
+                                // (instead of the default General).
+                                onAddSource = {
+                                    pendingSettingsTab = com.yancotv.android.ui.settings.SettingsTab.Sources
+                                    section = AppSection.Settings
+                                },
+                                onPlay = { list, idx, resumeEpisodeId ->
+                                    val target = list.getOrNull(idx) ?: return@HomeContent
+                                    gatedPlay(target.id) {
+                                        when (target.type) {
+                                            ContentType.LIVE, ContentType.MOVIE -> {
+                                                if (controller.currentId != target.id) controller.play(list, idx)
+                                                PlayerLauncher.launch(context)
+                                            }
+                                            ContentType.SERIES -> {
+                                                // Continue Watching path. The episode the
+                                                // user gets depends on the most-recent
+                                                // watch_history row's state:
+                                                //   - No history → open detail page so the
+                                                //     user can pick (matches "first visit"
+                                                //     UX).
+                                                //   - Mid-stream → resume that episode at
+                                                //     its stored offset.
+                                                //   - Finished (≥95% per `isFinished()`) →
+                                                //     advance to the next episode in the
+                                                //     series. If no next episode (end of
+                                                //     series), restart the last one from 0.
+                                                // The "finished → next" routing is the
+                                                // Netflix-style behavior; without it,
+                                                // tapping a binge-watched series re-plays
+                                                // the just-finished episode, which is what
+                                                // the loop bug was masking.
+                                                if (resumeEpisodeId == null) {
                                                     openDetail(target)
-                                                } else {
-                                                    // Always go through controller.play —
-                                                    // its SameTarget branch is a cheap
-                                                    // unpause-only no-rebuffer path now
-                                                    // (see PlaybackController.play).
-                                                    // The prior `if (currentId != target)`
-                                                    // guard meant tapping Continue Watching
-                                                    // on the same episode that was just
-                                                    // paused did NOTHING — the launch fired
-                                                    // but the player stayed paused.
-                                                    controller.play(playable, fromStart = fromStart)
-                                                    PlayerLauncher.launch(context)
+                                                    return@gatedPlay
+                                                }
+                                                homeScope.launch(Dispatchers.IO) {
+                                                    val resumeInfo =
+                                                        runCatching {
+                                                            history.mostRecentEpisode(target.id)
+                                                        }.getOrNull()
+                                                    val (episode, fromStart) =
+                                                        if (resumeInfo != null && resumeInfo.isFinished()) {
+                                                            val next =
+                                                                runCatching {
+                                                                    repo.nextEpisodeAfter(
+                                                                        seriesId = target.id,
+                                                                        currentEpisodeId = resumeInfo.episodeId,
+                                                                    )
+                                                                }.getOrNull()
+                                                            if (next != null) {
+                                                                next to false
+                                                            } else {
+                                                                // End of series — restart the last
+                                                                // watched episode from 0. positionForEpisode
+                                                                // returns null on finished rows so the
+                                                                // setMediaItem path already skips the
+                                                                // seek; fromStart=true is belt-and-
+                                                                // suspenders.
+                                                                val last =
+                                                                    runCatching {
+                                                                        repo.episodeById(resumeInfo.episodeId)
+                                                                    }.getOrNull()
+                                                                last to true
+                                                            }
+                                                        } else {
+                                                            val ep =
+                                                                runCatching {
+                                                                    repo.episodeById(resumeEpisodeId)
+                                                                }.getOrNull()
+                                                            ep to false
+                                                        }
+                                                    val playable = episode?.toPlayable(target)
+                                                    withContext(Dispatchers.Main) {
+                                                        if (playable == null) {
+                                                            openDetail(target)
+                                                        } else {
+                                                            // Always go through controller.play —
+                                                            // its SameTarget branch is a cheap
+                                                            // unpause-only no-rebuffer path now
+                                                            // (see PlaybackController.play).
+                                                            // The prior `if (currentId != target)`
+                                                            // guard meant tapping Continue Watching
+                                                            // on the same episode that was just
+                                                            // paused did NOTHING — the launch fired
+                                                            // but the player stayed paused.
+                                                            controller.play(playable, fromStart = fromStart)
+                                                            PlayerLauncher.launch(context)
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
                                     }
-                                }
-                            }
-                        },
-                    )
+                                },
+                            )
+                        }
+                    } else {
+                        Box(modifier = Modifier.weight(1f)) {
+                            PlaceholderArea(section = section)
+                        }
+                    }
                 }
-            } else {
-                Box(modifier = Modifier.weight(1f)) {
-                    PlaceholderArea(section = section)
-                }
-            }
-        }
 
-        if (!usesSidebar) {
-            SectionFlowBar(
-                current = section,
-                onSelect = { section = it },
-                onOpenOverflow = { showOverflow = true },
-            )
-        }
-        }
-
-        // MK.37.H.1 — the More sheet.
-        //
-        // `SectionFlowBar` has been setting `showOverflow` since MK.37.B and
-        // NOTHING read it: the sheet composable was written and never rendered.
-        // Tapping More therefore ran the indicator out to its slot and back and
-        // opened nothing, which is exactly what it looked like — the marker
-        // returning to where it came from. Neither the compiler nor lint could
-        // catch it; a public composable that is never called is not an unused
-        // symbol.
-        //
-        // Built like the search overlay above rather than as a Material sheet,
-        // so it dims the shell the same way and dismisses on a scrim tap or on
-        // BACK. Anchored to the bottom because that is where the bar it belongs
-        // to lives.
-        if (showOverflow) {
-            BackHandler { showOverflow = false }
-            Box(
-                modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.72f))
-                    .pointerInput(Unit) { detectTapGestures { showOverflow = false } },
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                // Swallows taps that land on the sheet itself, so choosing a
-                // destination does not also dismiss through the scrim beneath.
-                Box(modifier = Modifier.pointerInput(Unit) { detectTapGestures { } }) {
-                    SectionOverflowSheet(
+                if (!usesSidebar) {
+                    SectionFlowBar(
                         current = section,
-                        onSelect = {
-                            section = it
-                            showOverflow = false
-                        },
+                        onSelect = { section = it },
+                        onOpenOverflow = { showOverflow = true },
                     )
                 }
             }
-        }
 
-        // Search overlay — rides above the Row so it dims everything.
-        // Audit-pass-1: `.clickable` on the scrim and the inner Box was
-        // creating two extra focusable D-pad targets on TV (same root
-        // cause the legacy PlayerOptionsSheet documented). Touch dismiss
-        // now goes through `pointerInput { detectTapGestures }` so the
-        // scrim doesn't register as a focus target — D-pad navigation
-        // reaches the actual SearchScreen widgets directly.
-        if (searchOverlayVisible) {
-            Box(
-                modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.72f))
-                    .pointerInput(Unit) {
-                        detectTapGestures { SearchOverlayState.hide() }
-                    },
-                contentAlignment = Alignment.TopCenter,
-            ) {
+            // MK.37.H.1 — the More sheet.
+            //
+            // `SectionFlowBar` has been setting `showOverflow` since MK.37.B and
+            // NOTHING read it: the sheet composable was written and never rendered.
+            // Tapping More therefore ran the indicator out to its slot and back and
+            // opened nothing, which is exactly what it looked like — the marker
+            // returning to where it came from. Neither the compiler nor lint could
+            // catch it; a public composable that is never called is not an unused
+            // symbol.
+            //
+            // Built like the search overlay above rather than as a Material sheet,
+            // so it dims the shell the same way and dismisses on a scrim tap or on
+            // BACK. Anchored to the bottom because that is where the bar it belongs
+            // to lives.
+            if (showOverflow) {
+                BackHandler { showOverflow = false }
                 Box(
                     modifier =
                     Modifier
-                        .fillMaxWidth(if (isTv) 0.6f else 1f)
-                        .fillMaxHeight()
-                        .background(LocalYancoPalette.current.BackgroundDeep)
-                        // MK.28.1 — panel background full-bleed, content inset
-                        // (order matters: padding after background).
-                        .windowInsetsPadding(WindowInsets.safeDrawing)
-                        // MK.28.5 (MB-262) — trap D-pad focus inside the
-                        // overlay (SeasonPickerOverlay pattern). Without it,
-                        // DOWN from an empty result list / LEFT from the
-                        // leftmost orb escaped to the dimmed shell behind the
-                        // scrim: CENTER then activated invisible controls and
-                        // the shell's BackHandlers (registered later = higher
-                        // priority) ate BACK so the overlay looked stuck.
-                        .focusGroup()
-                        .focusProperties { exit = { FocusRequester.Cancel } }
-                        // Eat tap so the outer scrim's dismiss
-                        // doesn't fire when the user taps inside the
-                        // search panel itself. Empty handler is
-                        // enough — touch consumed by pointerInput.
-                        .pointerInput(Unit) { detectTapGestures { } },
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.72f))
+                        .pointerInput(Unit) { detectTapGestures { showOverflow = false } },
+                    contentAlignment = Alignment.BottomCenter,
                 ) {
-                    SearchScreen(isTv = isTv, onShowDetail = { openDetail(it) })
+                    // Swallows taps that land on the sheet itself, so choosing a
+                    // destination does not also dismiss through the scrim beneath.
+                    Box(modifier = Modifier.pointerInput(Unit) { detectTapGestures { } }) {
+                        SectionOverflowSheet(
+                            current = section,
+                            onSelect = {
+                                section = it
+                                showOverflow = false
+                            },
+                        )
+                    }
                 }
             }
-        }
 
-        // Movie / series detail overlay.
-        //
-        // Detail is NOT dismissed when the player launches — the overlay
-        // lives behind PlayerActivity so BACK from the player returns the
-        // user to the episodes page / movie detail, then another BACK
-        // dismisses detail and drops back onto the rail. Matches the
-        // hierarchical BACK chain: Player → Detail → Rail → Chips → Sidebar.
-        detailItem?.let { item ->
-            ContentDetailScreen(
-                item = item,
-                onPlayContent = { target ->
-                    // Series containers have no playable stream — they reach
-                    // this branch only as a last-ditch fallback (detail's
-                    // HeroBlock routes to onPlayEpisode when episodes exist).
-                    // Blank-URL short-circuit: stay on detail, no dead player.
-                    if (target.streamUrl.isNotBlank() && target.type != ContentType.SERIES) {
-                        if (controller.currentId != target.id) {
-                            controller.play(listOf(target), 0)
-                        }
-                        PlayerLauncher.launch(context)
+            // Search overlay — rides above the Row so it dims everything.
+            // Audit-pass-1: `.clickable` on the scrim and the inner Box was
+            // creating two extra focusable D-pad targets on TV (same root
+            // cause the legacy PlayerOptionsSheet documented). Touch dismiss
+            // now goes through `pointerInput { detectTapGestures }` so the
+            // scrim doesn't register as a focus target — D-pad navigation
+            // reaches the actual SearchScreen widgets directly.
+            if (searchOverlayVisible) {
+                Box(
+                    modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.72f))
+                        .pointerInput(Unit) {
+                            detectTapGestures { SearchOverlayState.hide() }
+                        },
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    Box(
+                        modifier =
+                        Modifier
+                            .fillMaxWidth(if (isTv) 0.6f else 1f)
+                            .fillMaxHeight()
+                            .background(LocalYancoPalette.current.BackgroundDeep)
+                            // MK.28.1 — panel background full-bleed, content inset
+                            // (order matters: padding after background).
+                            .windowInsetsPadding(WindowInsets.safeDrawing)
+                            // MK.28.5 (MB-262) — trap D-pad focus inside the
+                            // overlay (SeasonPickerOverlay pattern). Without it,
+                            // DOWN from an empty result list / LEFT from the
+                            // leftmost orb escaped to the dimmed shell behind the
+                            // scrim: CENTER then activated invisible controls and
+                            // the shell's BackHandlers (registered later = higher
+                            // priority) ate BACK so the overlay looked stuck.
+                            .focusGroup()
+                            .focusProperties { exit = { FocusRequester.Cancel } }
+                            // Eat tap so the outer scrim's dismiss
+                            // doesn't fire when the user taps inside the
+                            // search panel itself. Empty handler is
+                            // enough — touch consumed by pointerInput.
+                            .pointerInput(Unit) { detectTapGestures { } },
+                    ) {
+                        SearchScreen(isTv = isTv, onShowDetail = { openDetail(it) })
                     }
-                },
-                onPlayEpisode = { target, ep ->
-                    // Type-safe episode play via the Playable sealed type.
-                    // toPlayable() returns null for blank stream URLs.
-                    // PlaybackController.play(Playable.Episode) writes
-                    // watch_history with content_id = seriesId (the FK
-                    // target — series rows live in `content`, episodes
-                    // don't) and episode_id = ep.id, so each episode gets
-                    // its own resume key without violating the FK.
-                    //
-                    // Always call controller.play — even when the player
-                    // already has this episode loaded (same-id). The
-                    // SameTarget branch in PlaybackController is now a
-                    // cheap unpause-only path. The prior `if (currentId !=
-                    // ep.id)` guard meant resuming the same paused episode
-                    // did nothing.
-                    val playable = ep.toPlayable(target)
-                    if (playable != null) {
-                        controller.play(playable)
-                        PlayerLauncher.launch(context)
-                    }
-                },
-                onPlayFromStart = { target, ep ->
-                    // "Play from beginning" — never honour the stored
-                    // resume offset, but also don't delete the row so a
-                    // brief restart-then-exit preserves the prior
-                    // mid-stream position. The fromStart flag on
-                    // controller.play tells loadCurrent to skip the
-                    // positionFor / positionForEpisode lookup entirely.
-                    if (ep != null) {
-                        val playable = ep.toPlayable(target)
-                        if (playable != null) {
-                            controller.play(playable, fromStart = true)
+                }
+            }
+
+            // Movie / series detail overlay.
+            //
+            // Detail is NOT dismissed when the player launches — the overlay
+            // lives behind PlayerActivity so BACK from the player returns the
+            // user to the episodes page / movie detail, then another BACK
+            // dismisses detail and drops back onto the rail. Matches the
+            // hierarchical BACK chain: Player → Detail → Rail → Chips → Sidebar.
+            detailItem?.let { item ->
+                ContentDetailScreen(
+                    item = item,
+                    onPlayContent = { target ->
+                        // Series containers have no playable stream — they reach
+                        // this branch only as a last-ditch fallback (detail's
+                        // HeroBlock routes to onPlayEpisode when episodes exist).
+                        // Blank-URL short-circuit: stay on detail, no dead player.
+                        if (target.streamUrl.isNotBlank() && target.type != ContentType.SERIES) {
+                            if (controller.currentId != target.id) {
+                                controller.play(listOf(target), 0)
+                            }
                             PlayerLauncher.launch(context)
                         }
-                    } else if (target.streamUrl.isNotBlank() && target.type != ContentType.SERIES) {
-                        controller.play(listOf(target), 0, fromStart = true)
-                        PlayerLauncher.launch(context)
-                    }
-                },
-                onResetProgress = { _ ->
-                    // No-op at the parent level — the detail screen
-                    // already executed the wipe via watchHistory.removeForContent
-                    // before calling back. Hook kept on the callback
-                    // surface so callers that want to react (snackbar,
-                    // analytics) have one place to do it.
-                },
-                onDismiss = { openDetail(null) },
-            )
-        }
+                    },
+                    onPlayEpisode = { target, ep ->
+                        // Type-safe episode play via the Playable sealed type.
+                        // toPlayable() returns null for blank stream URLs.
+                        // PlaybackController.play(Playable.Episode) writes
+                        // watch_history with content_id = seriesId (the FK
+                        // target — series rows live in `content`, episodes
+                        // don't) and episode_id = ep.id, so each episode gets
+                        // its own resume key without violating the FK.
+                        //
+                        // Always call controller.play — even when the player
+                        // already has this episode loaded (same-id). The
+                        // SameTarget branch in PlaybackController is now a
+                        // cheap unpause-only path. The prior `if (currentId !=
+                        // ep.id)` guard meant resuming the same paused episode
+                        // did nothing.
+                        val playable = ep.toPlayable(target)
+                        if (playable != null) {
+                            controller.play(playable)
+                            PlayerLauncher.launch(context)
+                        }
+                    },
+                    onPlayFromStart = { target, ep ->
+                        // "Play from beginning" — never honour the stored
+                        // resume offset, but also don't delete the row so a
+                        // brief restart-then-exit preserves the prior
+                        // mid-stream position. The fromStart flag on
+                        // controller.play tells loadCurrent to skip the
+                        // positionFor / positionForEpisode lookup entirely.
+                        if (ep != null) {
+                            val playable = ep.toPlayable(target)
+                            if (playable != null) {
+                                controller.play(playable, fromStart = true)
+                                PlayerLauncher.launch(context)
+                            }
+                        } else if (target.streamUrl.isNotBlank() && target.type != ContentType.SERIES) {
+                            controller.play(listOf(target), 0, fromStart = true)
+                            PlayerLauncher.launch(context)
+                        }
+                    },
+                    onResetProgress = { _ ->
+                        // No-op at the parent level — the detail screen
+                        // already executed the wipe via watchHistory.removeForContent
+                        // before calling back. Hook kept on the callback
+                        // surface so callers that want to react (snackbar,
+                        // analytics) have one place to do it.
+                    },
+                    onDismiss = { openDetail(null) },
+                )
+            }
 
-        pendingPlay?.let { action ->
-            PinEntryDialog(
-                title = stringResource(R.string.fav_channel_locked),
-                body = stringResource(R.string.fav_channel_locked_body),
-                repo = parental,
-                onSuccess = {
-                    action()
-                    pendingPlay = null
-                },
-                onDismiss = { pendingPlay = null },
-            )
-        }
+            pendingPlay?.let { action ->
+                PinEntryDialog(
+                    title = stringResource(R.string.fav_channel_locked),
+                    body = stringResource(R.string.fav_channel_locked_body),
+                    repo = parental,
+                    onSuccess = {
+                        action()
+                        pendingPlay = null
+                    },
+                    onDismiss = { pendingPlay = null },
+                )
+            }
 
-        if (needsSettingsGate) {
-            PinEntryDialog(
-                title = stringResource(R.string.pin_required),
-                body = stringResource(R.string.pin_required_settings),
-                repo = parental,
-                onSuccess = { settingsUnlocked = true },
-                onDismiss = { section = AppSection.LiveTv },
-            )
+            if (needsSettingsGate) {
+                PinEntryDialog(
+                    title = stringResource(R.string.pin_required),
+                    body = stringResource(R.string.pin_required_settings),
+                    repo = parental,
+                    onSuccess = { settingsUnlocked = true },
+                    onDismiss = { section = AppSection.LiveTv },
+                )
+            }
         }
-    }
     }
 }
 

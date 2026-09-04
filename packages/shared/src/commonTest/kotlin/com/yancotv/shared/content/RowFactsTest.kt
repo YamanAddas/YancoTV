@@ -8,11 +8,7 @@ import kotlin.test.assertNull
 
 class RowFactsTest {
 
-    private fun row(
-        id: String = "1",
-        title: String,
-        metadata: String? = null,
-    ) = ContentItem(
+    private fun row(id: String = "1", title: String, metadata: String? = null) = ContentItem(
         id = id,
         sourceId = "s",
         type = ContentType.MOVIE,

@@ -2,16 +2,16 @@ package com.yancotv.android.ui.shell
 
 import android.util.Log
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -24,6 +24,7 @@ import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
+import com.yancotv.android.ui.theme.LocalShellMetrics
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.content.SourceCategoryTreeBuilder
 import com.yancotv.shared.sources.SourceRepository
@@ -31,7 +32,6 @@ import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.yancotv.android.ui.theme.LocalShellMetrics
 import org.koin.compose.koinInject
 
 /**

@@ -71,7 +71,10 @@ data class RowFacts(
     val plot: String?,
 )
 
-private val factsJson = Json { ignoreUnknownKeys = true; isLenient = true }
+private val factsJson = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+}
 
 /**
  * Reads [RowFacts] for a page of rows.
@@ -105,15 +108,12 @@ fun rowFacts(items: List<ContentItem>): List<RowFacts> = items.map { item ->
  * `01/04/2023`. Rather than parse a date, take the first four-digit run
  * that could be a year, which is right for all three and refuses the rest.
  */
-private fun yearFromDate(raw: String): Int? =
-    Regex("""(?:^|\D)((?:19|20)\d{2})(?:\D|$)""")
-        .find(raw)
-        ?.groupValues
-        ?.get(1)
-        ?.toIntOrNull()
+private fun yearFromDate(raw: String): Int? = Regex("""(?:^|\D)((?:19|20)\d{2})(?:\D|$)""")
+    .find(raw)
+    ?.groupValues
+    ?.get(1)
+    ?.toIntOrNull()
 
 private fun parseRowMetadata(raw: String): ContentMetadata? = runCatching {
     factsJson.decodeFromString<ContentMetadata>(raw)
 }.getOrNull()
-
-

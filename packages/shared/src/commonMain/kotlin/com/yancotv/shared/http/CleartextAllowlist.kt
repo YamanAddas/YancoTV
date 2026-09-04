@@ -140,5 +140,4 @@ private val HTTP_HOST_REGEX = Regex(
  * subscriber's credentials in its query string, and this message is
  * logged.
  */
-class CleartextBlockedException(val host: String) :
-    Exception("Plain HTTP to \"$host\" is not allowed: it is not one of the configured sources.")
+class CleartextBlockedException(val host: String) : Exception("Plain HTTP to \"$host\" is not allowed: it is not one of the configured sources.")

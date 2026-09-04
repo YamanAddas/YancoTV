@@ -2,14 +2,14 @@ package com.yancotv.android.ui.shell
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.DraggableState
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,11 +73,7 @@ import kotlin.math.abs
  * nothing would pull the drawer shut, because the grid under the finger takes
  * every other gesture as a scroll.
  */
-private fun Modifier.tapOrDrag(
-    dragState: DraggableState,
-    onTap: () -> Unit,
-    onDragStopped: () -> Unit,
-): Modifier = this
+private fun Modifier.tapOrDrag(dragState: DraggableState, onTap: () -> Unit, onDragStopped: () -> Unit): Modifier = this
     .draggable(
         state = dragState,
         orientation = Orientation.Vertical,
@@ -122,13 +118,7 @@ data class CategoryEntry(val name: String, val count: Int)
  * is down — and the grid is lazy, so collapsed it only builds the row that fits.
  */
 @Composable
-fun CategoryDrawer(
-    entries: List<CategoryEntry>,
-    totalCount: Int,
-    selected: String,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun CategoryDrawer(entries: List<CategoryEntry>, totalCount: Int, selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     val palette = LocalYancoPalette.current
     val metrics = LocalShellMetrics.current
     val density = LocalDensity.current
@@ -290,43 +280,43 @@ fun CategoryDrawer(
         // ── the grabber ──
         //
         // The one control that works in both directions from either state,
-    // including closing — with the gesture on the header alone there is
-    // nothing to pull *up* once the grid has taken the rest of the drawer.
-    //
-    // **It is a real row inside the drawer, not an overlay on the border.**
-    // The first version drew it inside a `Modifier.height(1.dp)` strip so it
-    // could sit on the hairline. It rendered correctly and was completely
-    // dead: Compose clips touch to the parent's bounds, so a 46x18 target in a
-    // 1 dp-tall parent receives nothing. Dragging the drawer shut was
-    // impossible, because the header is the only other handle and the grid
-    // under the finger takes the gesture as a scroll.
-    Box(
-        modifier =
-        Modifier
-            .fillMaxWidth()
-            .height(GrabberRow)
-            .tapOrDrag(
+        // including closing — with the gesture on the header alone there is
+        // nothing to pull *up* once the grid has taken the rest of the drawer.
+        //
+        // **It is a real row inside the drawer, not an overlay on the border.**
+        // The first version drew it inside a `Modifier.height(1.dp)` strip so it
+        // could sit on the hairline. It rendered correctly and was completely
+        // dead: Compose clips touch to the parent's bounds, so a 46x18 target in a
+        // 1 dp-tall parent receives nothing. Dragging the drawer shut was
+        // impossible, because the header is the only other handle and the grid
+        // under the finger takes the gesture as a scroll.
+        Box(
+            modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(GrabberRow)
+                .tapOrDrag(
                     dragState = dragState,
                     onTap = { toggle() },
                     onDragStopped = { endDrag() },
                 )
-            .semantics {
-                contentDescription = if (isOpen) collapseLabel else expandLabel
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier =
-            Modifier
-                .width(46.dp)
-                .height(18.dp)
-                .background(palette.BackgroundRaised, RoundedCornerShape(5.dp)),
+                .semantics {
+                    contentDescription = if (isOpen) collapseLabel else expandLabel
+                },
             contentAlignment = Alignment.Center,
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                repeat(2) {
-                    Box(Modifier.width(22.dp).height(1.5.dp).background(palette.TextMuted, RoundedCornerShape(1.dp)))
-                }
+            Box(
+                modifier =
+                Modifier
+                    .width(46.dp)
+                    .height(18.dp)
+                    .background(palette.BackgroundRaised, RoundedCornerShape(5.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    repeat(2) {
+                        Box(Modifier.width(22.dp).height(1.5.dp).background(palette.TextMuted, RoundedCornerShape(1.dp)))
+                    }
                 }
             }
         }
@@ -347,13 +337,7 @@ fun CategoryDrawer(
  * state. The bevelled accent-washed chip this replaces was rejected outright.
  */
 @Composable
-private fun CategoryTile(
-    name: String,
-    count: Int?,
-    isSelected: Boolean,
-    strip: Boolean = false,
-    onClick: () -> Unit,
-) {
+private fun CategoryTile(name: String, count: Int?, isSelected: Boolean, strip: Boolean = false, onClick: () -> Unit) {
     val palette = LocalYancoPalette.current
     Row(
         modifier =

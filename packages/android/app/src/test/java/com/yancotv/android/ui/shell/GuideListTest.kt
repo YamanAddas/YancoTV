@@ -16,11 +16,9 @@ import org.junit.Test
  */
 class GuideListTest {
 
-    private fun programme(id: String, start: Long, end: Long) =
-        EpgProgramme(id = id, channelTvgId = "c", title = "P$id", startTime = start, endTime = end)
+    private fun programme(id: String, start: Long, end: Long) = EpgProgramme(id = id, channelTvgId = "c", title = "P$id", startTime = start, endTime = end)
 
-    private fun channel(vararg p: EpgProgramme) =
-        EpgGuideChannel(id = "ch", tvgId = "c", name = "Channel", programmes = p.toList())
+    private fun channel(vararg p: EpgProgramme) = EpgGuideChannel(id = "ch", tvgId = "c", name = "Channel", programmes = p.toList())
 
     private val now = 1_000_000L
 

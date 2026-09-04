@@ -35,10 +35,9 @@ class ContentRepository(private val db: YancoDb) {
      * Same ordering (provider order), one aggregate query rather than a
      * count per category — see the note on `groupTalliesForType`.
      */
-    fun groupTallies(type: ContentType): List<Pair<String, Int>> =
-        db.contentQueries
-            .groupTalliesForType(type.dbValue) { name, count -> name to count.toInt() }
-            .executeAsList()
+    fun groupTallies(type: ContentType): List<Pair<String, Int>> = db.contentQueries
+        .groupTalliesForType(type.dbValue) { name, count -> name to count.toInt() }
+        .executeAsList()
 
     /**
      * MK.20.2 — Group list bucketed by detected language/region prefix.
@@ -173,8 +172,7 @@ class ContentRepository(private val db: YancoDb) {
      * search-rails UI calls this once per [ContentType] so each rail
      * gets its own slice.
      */
-    fun searchByType(query: String, type: ContentType, limit: Long = 100): List<ContentItem> =
-        searchByTypePaged(query, type, offset = 0L, limit = limit)
+    fun searchByType(query: String, type: ContentType, limit: Long = 100): List<ContentItem> = searchByTypePaged(query, type, offset = 0L, limit = limit)
 
     /**
      * MK.iOS.PAGE.2 — paged [searchByType].

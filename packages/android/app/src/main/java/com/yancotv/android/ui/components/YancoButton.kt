@@ -468,17 +468,17 @@ internal data class YancoButtonColors(val borderColor: Color, val textColor: Col
  * That makes "focused + disabled" a real, reachable state: the cursor is
  * parked on a button it cannot activate. The frame must still mark the
  * cursor — a TV screen with no visible focus is a dead end — but at
- * [DisabledFocusFrameAlpha] of the ring colour so it doesn't promise an
+ * [DISABLED_FOCUS_FRAME_ALPHA] of the ring colour so it doesn't promise an
  * action the button won't perform. Fill and text stay in their muted
  * disabled forms; only the frame carries the cursor.
  */
-internal const val DisabledFocusFrameAlpha = 0.45f
+internal const val DISABLED_FOCUS_FRAME_ALPHA = 0.45f
 
 internal fun primarySolidColors(palette: YancoPalette, focused: Boolean, enabled: Boolean): YancoButtonColors = YancoButtonColors(
     borderColor =
     when {
         focused && enabled -> palette.FocusRing
-        focused -> palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha)
+        focused -> palette.FocusRing.copy(alpha = DISABLED_FOCUS_FRAME_ALPHA)
         else -> Color.White.copy(alpha = 0.18f)
     },
     textColor = if (enabled) OnAccentInk else palette.TextMuted,
@@ -489,7 +489,7 @@ internal fun primaryTranslucentColors(palette: YancoPalette, focused: Boolean, e
     borderColor =
     when {
         focused && enabled -> palette.FocusRing
-        focused -> palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha)
+        focused -> palette.FocusRing.copy(alpha = DISABLED_FOCUS_FRAME_ALPHA)
         !enabled -> palette.Accent.copy(alpha = 0.20f)
         else -> palette.Accent.copy(alpha = 0.55f)
     },
@@ -506,7 +506,7 @@ internal fun secondaryColors(palette: YancoPalette, focused: Boolean, enabled: B
     borderColor =
     when {
         focused && enabled -> palette.FocusRing
-        focused -> palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha)
+        focused -> palette.FocusRing.copy(alpha = DISABLED_FOCUS_FRAME_ALPHA)
         !enabled -> palette.BorderSubtle
         else -> palette.PanelBorder
     },
@@ -525,7 +525,7 @@ internal fun dangerColors(palette: YancoPalette, focused: Boolean, enabled: Bool
         focused && enabled -> palette.Error
         // Danger keeps its own hue even for the parked-cursor frame —
         // destructive stays visually distinct from neutral at every state.
-        focused -> palette.Error.copy(alpha = DisabledFocusFrameAlpha)
+        focused -> palette.Error.copy(alpha = DISABLED_FOCUS_FRAME_ALPHA)
         !enabled -> palette.Error.copy(alpha = 0.16f)
         else -> palette.Error.copy(alpha = 0.4f)
     },

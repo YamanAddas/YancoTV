@@ -90,7 +90,7 @@ class YancoButtonColorsTest {
         // the ring, never the full FocusRing, so it doesn't promise an
         // action the button won't perform. Text stays muted.
         val c = primarySolidColors(palette, focused = true, enabled = false)
-        assertEquals(palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha), c.borderColor)
+        assertEquals(palette.FocusRing.copy(alpha = DISABLED_FOCUS_FRAME_ALPHA), c.borderColor)
         assertNotEquals(palette.FocusRing, c.borderColor)
         assertEquals(palette.TextMuted, c.textColor)
         // Focus width still applies — thickness + dim ring is the
@@ -194,14 +194,14 @@ class YancoButtonColorsTest {
 
     @Test fun translucentPrimaryFocusedWhileDisabledShowsDimmedFrame() {
         val c = primaryTranslucentColors(palette, focused = true, enabled = false)
-        assertEquals(palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha), c.borderColor)
+        assertEquals(palette.FocusRing.copy(alpha = DISABLED_FOCUS_FRAME_ALPHA), c.borderColor)
         assertEquals(palette.TextMuted, c.textColor)
         assertTrue(c.borderWidthIsFocus)
     }
 
     @Test fun secondaryFocusedWhileDisabledShowsDimmedFrame() {
         val c = secondaryColors(palette, focused = true, enabled = false)
-        assertEquals(palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha), c.borderColor)
+        assertEquals(palette.FocusRing.copy(alpha = DISABLED_FOCUS_FRAME_ALPHA), c.borderColor)
         assertEquals(palette.TextMuted, c.textColor)
         assertTrue(c.borderWidthIsFocus)
     }
@@ -210,7 +210,7 @@ class YancoButtonColorsTest {
         // Danger dims its OWN hue, not FocusRing — destructive stays
         // visually distinct from neutral in every state.
         val c = dangerColors(palette, focused = true, enabled = false)
-        assertEquals(palette.Error.copy(alpha = DisabledFocusFrameAlpha), c.borderColor)
+        assertEquals(palette.Error.copy(alpha = DISABLED_FOCUS_FRAME_ALPHA), c.borderColor)
         assertEquals(palette.TextMuted, c.textColor)
         assertTrue(c.borderWidthIsFocus)
     }
@@ -220,7 +220,7 @@ class YancoButtonColorsTest {
         // for the parked-cursor state: the dim frame must follow the
         // theme's FocusRing token, not a pinned colour.
         listOf(FrostedEmerald, MidnightSapphire, WarmAmber).forEach { p ->
-            val expected = p.FocusRing.copy(alpha = DisabledFocusFrameAlpha)
+            val expected = p.FocusRing.copy(alpha = DISABLED_FOCUS_FRAME_ALPHA)
             assertEquals(expected, primarySolidColors(p, focused = true, enabled = false).borderColor)
             assertEquals(expected, primaryTranslucentColors(p, focused = true, enabled = false).borderColor)
             assertEquals(expected, secondaryColors(p, focused = true, enabled = false).borderColor)

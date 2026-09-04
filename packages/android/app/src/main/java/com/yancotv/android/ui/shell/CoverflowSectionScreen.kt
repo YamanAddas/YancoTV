@@ -103,12 +103,12 @@ import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentDetailService
 import com.yancotv.shared.content.ContentRepository
+import com.yancotv.shared.content.rowFacts
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.history.WatchProgress
 import com.yancotv.shared.parental.ParentalRepository
-import com.yancotv.shared.content.rowFacts
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentMetadata
 import com.yancotv.shared.types.ContentType

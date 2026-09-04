@@ -192,10 +192,7 @@ object EpgNameKey {
      * redundancy rather than a clash, and is resolved at read time by
      * preferring the channel's own provider.
      */
-    fun uniqueIndex(
-        channels: List<Pair<String, String?>>,
-        programmeCounts: Map<String, Int> = emptyMap(),
-    ): Map<String, String> {
+    fun uniqueIndex(channels: List<Pair<String, String?>>, programmeCounts: Map<String, Int> = emptyMap()): Map<String, String> {
         val best = mutableMapOf<String, String>()
         for ((tvgId, displayName) in channels) {
             val key = keyFor(displayName) ?: continue

@@ -157,8 +157,7 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
      * bind-variable count, and `watch_history` holds one row per watched
      * title — a small table, cheap to select entire.
      */
-    fun allProgress(): Map<String, WatchProgress> =
-        resolveContentProgress(db.watchHistoryQueries.selectAllProgress().executeAsList())
+    fun allProgress(): Map<String, WatchProgress> = resolveContentProgress(db.watchHistoryQueries.selectAllProgress().executeAsList())
 
     /**
      * Container-preferred resolution shared by [entriesByContentFlow] and

@@ -110,7 +110,8 @@ class EpgRepository(
         // Ordered so the channel's own provider's guide comes first; the
         // first row per key wins.
         val idByKey = mutableMapOf<String, String>()
-        for (row in db.epgChannelNamesQueries
+        for (
+        row in db.epgChannelNamesQueries
             .resolveKeys(keyByName.values.toSet(), preferSourceId)
             .executeAsList()
         ) {
@@ -156,8 +157,7 @@ class EpgRepository(
         .map { it.toDomain() }
 
     /** One programme by id, for catch-up and reminders. */
-    fun programmeById(id: String): EpgProgramme? =
-        db.epgProgrammesQueries.byId(id).executeAsOneOrNull()?.toDomain()
+    fun programmeById(id: String): EpgProgramme? = db.epgProgrammesQueries.byId(id).executeAsOneOrNull()?.toDomain()
 
     fun getProgrammesForChannel(tvgId: String, startTime: Long, endTime: Long): List<EpgProgramme> = db.epgProgrammesQueries
         .forChannelRange(tvgId, startTime, endTime)

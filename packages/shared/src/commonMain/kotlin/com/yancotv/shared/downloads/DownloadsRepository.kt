@@ -91,20 +91,10 @@ data class DownloadEntry(
  * The clock is injected for the same reason it is everywhere else here:
  * tests must not wait for wall time.
  */
-class DownloadsRepository(
-    private val db: YancoDb,
-    private val clock: () -> Long,
-) {
+class DownloadsRepository(private val db: YancoDb, private val clock: () -> Long) {
 
     /** Adds a row in `QUEUED`. The caller supplies the id. */
-    fun enqueue(
-        id: String,
-        contentId: String?,
-        episodeId: String?,
-        title: String,
-        streamUrl: String,
-        filePath: String,
-    ): DownloadEntry {
+    fun enqueue(id: String, contentId: String?, episodeId: String?, title: String, streamUrl: String, filePath: String): DownloadEntry {
         db.downloadsQueries.insert(
             id = id,
             content_id = contentId,
@@ -264,8 +254,7 @@ class DownloadsRepository(
 
     // ------------------------------------------------------------------
 
-    private fun require(id: String): DownloadEntry =
-        getById(id) ?: error("no such download: $id")
+    private fun require(id: String): DownloadEntry = getById(id) ?: error("no such download: $id")
 
     private fun rejectTerminal(row: DownloadEntry, to: DownloadStatus) {
         if (row.status.isTerminal()) {

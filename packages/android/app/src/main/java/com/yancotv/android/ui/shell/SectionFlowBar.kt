@@ -87,12 +87,7 @@ import kotlinx.coroutines.launch
  * `ShellMetrics.usesSidebar`. The two never coexist.
  */
 @Composable
-fun SectionFlowBar(
-    current: AppSection,
-    onSelect: (AppSection) -> Unit,
-    onOpenOverflow: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun SectionFlowBar(current: AppSection, onSelect: (AppSection) -> Unit, onOpenOverflow: () -> Unit, modifier: Modifier = Modifier) {
     val palette = LocalYancoPalette.current
     val items = AppSection.compactPrimary
     // The overflow occupies a slot in the flow like any other destination. It
@@ -250,13 +245,7 @@ private fun travel() = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy,
  * two cells swapping states at a threshold.
  */
 @Composable
-private fun FlowCell(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    nearness: Float,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-) {
+private fun FlowCell(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, nearness: Float, selected: Boolean, modifier: Modifier = Modifier) {
     val palette = LocalYancoPalette.current
     Column(
         modifier =

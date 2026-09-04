@@ -90,12 +90,10 @@ fun GuideList(
 }
 
 /** Currently-airing programme, or null when the guide does not cover now. */
-internal fun EpgGuideChannel.nowProgramme(nowSeconds: Long): EpgProgramme? =
-    programmes.firstOrNull { nowSeconds in it.startTime until it.endTime }
+internal fun EpgGuideChannel.nowProgramme(nowSeconds: Long): EpgProgramme? = programmes.firstOrNull { nowSeconds in it.startTime until it.endTime }
 
 /** The one after [nowProgramme], by start time. */
-internal fun EpgGuideChannel.nextProgramme(nowSeconds: Long): EpgProgramme? =
-    programmes.filter { it.startTime > nowSeconds }.minByOrNull { it.startTime }
+internal fun EpgGuideChannel.nextProgramme(nowSeconds: Long): EpgProgramme? = programmes.filter { it.startTime > nowSeconds }.minByOrNull { it.startTime }
 
 /**
  * How far through the current programme we are, 0..1.
@@ -111,12 +109,7 @@ internal fun programmeProgress(programme: EpgProgramme, nowSeconds: Long): Float
 }
 
 @Composable
-private fun GuideListRow(
-    channel: EpgGuideChannel,
-    nowSeconds: Long,
-    onPlay: () -> Unit,
-    onLongPress: () -> Unit,
-) {
+private fun GuideListRow(channel: EpgGuideChannel, nowSeconds: Long, onPlay: () -> Unit, onLongPress: () -> Unit) {
     val palette = LocalYancoPalette.current
     val now = channel.nowProgramme(nowSeconds)
     val next = channel.nextProgramme(nowSeconds)

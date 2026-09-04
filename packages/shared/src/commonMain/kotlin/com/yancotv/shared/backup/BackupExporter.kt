@@ -277,10 +277,9 @@ class BackupExporter(private val db: YancoDb, private val credentialStore: Crede
      * catalogue at this moment, which is exactly what a backup must not do
      * — the catalogue is restored separately and may not be present yet.
      */
-    private fun exportRecentChannels(): List<RecentChannelRecord> =
-        db.recentChannelsQueries.selectAllForBackup().executeAsList().map {
-            RecentChannelRecord(contentId = it.content_id, watchedAt = it.watched_at)
-        }
+    private fun exportRecentChannels(): List<RecentChannelRecord> = db.recentChannelsQueries.selectAllForBackup().executeAsList().map {
+        RecentChannelRecord(contentId = it.content_id, watchedAt = it.watched_at)
+    }
 
     private fun exportReminders(): List<ReminderRecord> = db.remindersQueries.selectAll().executeAsList().map {
         ReminderRecord(

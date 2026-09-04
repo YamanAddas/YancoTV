@@ -14,12 +14,11 @@ import org.junit.Test
  */
 class ShellMetricsTest {
 
-    private fun metrics(width: Int, height: Int, rail: Int = 0) =
-        ShellMetrics(
-            windowWidth = width.dp,
-            windowHeight = height.dp,
-            lane = (width - rail).dp,
-        )
+    private fun metrics(width: Int, height: Int, rail: Int = 0) = ShellMetrics(
+        windowWidth = width.dp,
+        windowHeight = height.dp,
+        lane = (width - rail).dp,
+    )
 
     // Real viewports, in dp.
     private val fireTv = metrics(960, 540, rail = 92)
@@ -181,7 +180,10 @@ class ShellMetricsTest {
     @Test
     fun `grid tiles stay about the same size from a normal phone upward`() {
         val screens = listOf(
-            metrics(411, 869), metrics(430, 932), metrics(708, 1280), metrics(868, 540),
+            metrics(411, 869),
+            metrics(430, 932),
+            metrics(708, 1280),
+            metrics(868, 540),
         )
         for (m in screens) {
             assertTrue(

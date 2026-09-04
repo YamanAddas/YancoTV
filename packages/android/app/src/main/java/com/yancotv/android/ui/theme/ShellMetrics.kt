@@ -237,8 +237,7 @@ internal fun isShortViewport(height: Dp): Boolean = height < 480.dp
 
 internal fun isNarrowViewport(width: Dp): Boolean = width < 600.dp
 
-internal fun usesSidebarFor(width: Dp, height: Dp): Boolean =
-    !isNarrowViewport(width) || isShortViewport(height)
+internal fun usesSidebarFor(width: Dp, height: Dp): Boolean = !isNarrowViewport(width) || isShortViewport(height)
 
 /**
  * Measures the current window and derives the lane from it.

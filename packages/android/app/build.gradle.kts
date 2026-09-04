@@ -886,4 +886,13 @@ tasks.withType<Test>().configureEach {
         .dir(layout.projectDirectory.dir("src/main/res"))
         .withPropertyName("androidStringResources")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // MB-414 — UnreferencedComposableTest walks the Kotlin sources. Without
+    // declaring them, Gradle has no reason to re-run the task when a new
+    // composable is added, so the check would report green against exactly the
+    // change it exists to catch. PluralResourceParityTest's header records the
+    // same trap being hit for real on `src/main/res`.
+    inputs
+        .dir(layout.projectDirectory.dir("src/main/java"))
+        .withPropertyName("androidKotlinSources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
