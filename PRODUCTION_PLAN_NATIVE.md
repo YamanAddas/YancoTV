@@ -2963,6 +2963,49 @@ Verified: 826 shared tests, 0 failures (2 new — one asserts the two banners ar
 that `### SPORTS`, `Ping-Pong -- Live` and `BBC News` all survive; the first draft of that assertion
 was wrong, not the filter). `:app:assembleDebug` and `:shared:lintDebug` green.
 
+### MK.36.4 — the same title carries the same facts on every list — shipped 2026-09-03
+
+The browse orb's second line was the provider's **group name** — "EN - NEW RELEASE" — which says
+which shelf a title sits on, not anything about the title. Year and rating are already on the row
+and cost nothing to read: measured on the live account, **164,224 of 175,064 movies (94%) carry a
+non-zero rating** and **135,471 (77%) carry a `(YYYY)`**. Movies and series now show `2019 · ★ 7.4`,
+falling back to the group name so a row with neither is not left blank. LIVE is untouched — its
+second line is the EPG now-title, which is the right fact for a channel.
+
+`PreviewFactsLine` moved onto `rowFacts` in the same commit, because the point is consistency: the
+pane and the orb beneath it must not disagree about the same title. It also fixes three wrong reads
+the pane had been making on its own:
+
+- `releaseDate.take(4)` assumes `2023-04-01`. Providers also send `01/04/2023`, which rendered as
+  **"01/0"**. `RowFacts.yearFromDate` takes the first plausible four-digit year instead, and
+  `RowFactsTest` now pins all three shapes.
+- A movie with no `releaseDate` showed no year, though the year is in the title on 77% of them —
+  and it has to be read off the **raw** title, since `cleanTitle` strips bracketed content and takes
+  `(2019)` with it.
+- A provider writes `"0"` for "not rated". That rendered as a confident **"★ 0"**; `RowFacts`
+  treats zero as absent.
+
+**Parsed per orb, not per page.** `rowFacts` is batched upstream because iOS pays a bridge crossing
+per call — a cost that does not exist here, while `visible` grows without bound as the user pages.
+A LazyRow only composes what is on screen, so a `remember` keyed on the row's identity parses a
+handful of rows at a time. Pure JSON over data already in memory, no I/O, so it is safe in
+composition (the same shape as the existing `parsePreviewMetadata`).
+
+**Spoken, not only shown.** The facts are appended to the orb's `contentDescription`. That
+description explicitly overrides merged descendant text — the MB-280 lesson — so the caption is
+never announced on its own, and adding a year and rating that TalkBack could not read would have
+been a half-fix.
+
+Rating is formatted with an explicit `Locale.getDefault()`, so an Arabic reader sees Arabic-Indic
+digits alongside the rest of the UI rather than a lone Latin number. Same rule the D.1a lint pass
+applied to time codes.
+
+Verified: 828 shared tests (2 new), 0 failures; `:app:testDebugUnitTest`, `:app:assembleDebug` and
+`:app:lintDebug` all green — lint clean on `DefaultLocale`.
+
+**Not verified on device.** Home's own rail tile was left alone; it is a separate composable and
+belongs in its own slice.
+
 ### What is deliberately NOT switched on, and why each needs real work
 
 Naming these here because the merge makes them *look* available. They are not.

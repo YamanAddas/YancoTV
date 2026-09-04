@@ -44,6 +44,33 @@ class RowFactsTest {
         assertNull(rowFacts(listOf(row(title = "Veda Mektubu"))).single().year)
     }
 
+    /**
+     * MK.36.4 — the reason the caller cannot just do `releaseDate.take(4)`.
+     *
+     * Providers send all three of these for the same field. `take(4)` is
+     * right for one of them and prints "01/0" for another, which is what the
+     * Android preview pane was rendering before it moved onto `rowFacts`.
+     */
+    @Test
+    fun `year is read from every release-date shape providers send`() {
+        val shapes = mapOf(
+            "2023-04-01" to 2023,
+            "2023" to 2023,
+            "01/04/2023" to 2023,
+        )
+        for ((raw, expected) in shapes) {
+            val item = row(title = "No Year In Title", metadata = """{"releaseDate":"$raw"}""")
+            assertEquals(expected, rowFacts(listOf(item)).single().year, "releaseDate=$raw")
+        }
+    }
+
+    /** A date that carries no plausible year yields null, not a fragment. */
+    @Test
+    fun `an unparseable release date yields no year`() {
+        val item = row(title = "No Year In Title", metadata = """{"releaseDate":"n/a"}""")
+        assertNull(rowFacts(listOf(item)).single().year)
+    }
+
     @Test
     fun `rating is read from the provider metadata`() {
         val facts = rowFacts(

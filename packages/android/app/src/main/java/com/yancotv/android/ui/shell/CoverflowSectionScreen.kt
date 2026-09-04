@@ -102,6 +102,7 @@ import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.history.WatchProgress
 import com.yancotv.shared.parental.ParentalRepository
+import com.yancotv.shared.content.rowFacts
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentMetadata
 import com.yancotv.shared.types.ContentType
@@ -1292,6 +1293,16 @@ private fun MetaColumn(
  * never empty on titles with no enriched metadata at all. Dot-separated,
  * single line, ellipsised — it is orientation, not content.
  */
+/**
+ * Provider rating for display, one decimal.
+ *
+ * Locale-explicit rather than `"$rating"`: the app ships Arabic and the
+ * number belongs to the reader's locale, so 7.4 renders with Arabic-Indic
+ * digits alongside the rest of the UI instead of staying Latin. This is the
+ * same rule the D.1a lint pass applied to time codes.
+ */
+private fun formatRating(rating: Double): String = String.format(java.util.Locale.getDefault(), "%.1f", rating)
+
 @Composable
 private fun PreviewFactsLine(item: ContentItem, meta: ContentMetadata?, type: ContentType) {
     val palette = LocalYancoPalette.current
@@ -1299,9 +1310,20 @@ private fun PreviewFactsLine(item: ContentItem, meta: ContentMetadata?, type: Co
     val ctx = LocalContext.current
     val facts =
         remember(item.id, meta, type) {
+            // MK.36.4 — year and rating come from `rowFacts`, not from the
+            // raw metadata, so this pane and the orb beneath it cannot
+            // disagree about the same title.
+            //
+            // It is not only consistency; the old reads were wrong three
+            // ways. `releaseDate.take(4)` assumes `2023-04-01` and prints
+            // "01/0" for the `01/04/2023` rows providers also send. A movie
+            // with no `releaseDate` showed no year at all, though 135,471 of
+            // 175,064 carry a `(YYYY)` in the title. And a provider writes
+            // "0" for "not rated", which rendered as a confident "★ 0".
+            val row = rowFacts(listOf(item)).firstOrNull()
             buildList {
-                meta?.releaseDate?.takeIf { it.isNotBlank() }?.let { add(it.take(4)) }
-                meta?.rating?.takeIf { it.isNotBlank() }?.let { add("★ $it") }
+                row?.year?.let { add(it.toString()) }
+                row?.rating?.let { add("★ " + formatRating(it)) }
                 meta?.genre?.takeIf { it.isNotBlank() }?.let { add(it) }
                 if (type == ContentType.SERIES) {
                     meta?.episodes?.size?.takeIf { it > 0 }?.let {
@@ -1633,6 +1655,25 @@ private fun ContentOrb(
 
     val title = item.cleanTitle?.ifBlank { null } ?: item.title
 
+    // MK.36.4 — year and rating for the caption line, and for the spoken
+    // description below.
+    //
+    // Parsed per orb rather than for the whole list: `rowFacts` batches
+    // because iOS pays a bridge crossing per call, a cost that does not
+    // exist here, and `visible` grows without bound as the user pages. A
+    // LazyRow only composes what is on screen, so this parses a handful of
+    // rows at a time. Pure JSON over data already in memory — no I/O, so it
+    // is safe in composition (same shape as `parsePreviewMetadata`).
+    val facts =
+        remember(item.id, item.metadataJson, type) {
+            if (type == ContentType.LIVE) null else rowFacts(listOf(item)).firstOrNull()
+        }
+    val factsLine =
+        listOfNotNull(
+            facts?.year?.toString(),
+            facts?.rating?.let { "★ " + formatRating(it) },
+        ).takeIf { it.isNotEmpty() }?.joinToString("  ·  ")
+
     Column(
         modifier =
         Modifier
@@ -1708,6 +1749,11 @@ private fun ContentOrb(
                     contentDescription =
                         buildString {
                             append(title)
+                            // MK.36.4 — spoken as well as shown. This
+                            // description overrides merged descendant text
+                            // (MB-280), so the caption below is never read
+                            // out on its own.
+                            factsLine?.let { append(", ").append(it) }
                             if (isLocked) append(ctx.getString(R.string.cf_locked_suffix))
                             when {
                                 progress?.isFinished() == true ->
@@ -1806,13 +1852,21 @@ private fun ContentOrb(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        // Secondary line: EPG now-title for LIVE, group name otherwise.
+        // Secondary line: EPG now-title for LIVE, facts otherwise.
+        //
+        // MK.36.4 — movies and series used to put the provider's group name
+        // here ("EN - NEW RELEASE"), which is the shelf the title sits on,
+        // not anything about the title. Year and rating are already on the
+        // row — 94% of movies carry a rating and 77% a `(YYYY)` — and cost
+        // nothing to read. Group name stays as the fallback so a row with
+        // neither is not left blank.
+        //
         val sub =
             when (type) {
                 ContentType.LIVE ->
                     nowNext?.now?.title?.takeIf { it.isNotBlank() }
                         ?: item.groupName.orEmpty()
-                else -> item.groupName.orEmpty()
+                else -> factsLine ?: item.groupName.orEmpty()
             }
         if (sub.isNotBlank()) {
             Text(
