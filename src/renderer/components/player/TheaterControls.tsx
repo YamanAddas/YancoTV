@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlayerStore } from '../../stores/player-store';
 import { useToastStore } from '../../stores/toast-store';
+import { useT } from '../../i18n';
 
 interface TheaterControlsProps {
   visible: boolean;
@@ -12,6 +13,7 @@ interface TheaterControlsProps {
  * Appears on mouse movement, disappears after inactivity.
  */
 export function TheaterControls({ visible, onInteraction }: TheaterControlsProps) {
+  const t = useT();
   const {
     status,
     currentTitle,
@@ -186,7 +188,7 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
           <button
             onClick={handleBack}
             className="flex h-9 items-center gap-2 rounded-full bg-white/10 pl-2.5 pr-3.5 text-sm font-medium text-white/85 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
-            title="Browse (Esc) — opens the channel menu, keeps playing in the mini-player"
+            title={t('theater.browse')}
           >
             <ArrowLeftIcon />
             <span>Browse</span>
@@ -224,8 +226,8 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
           <button
             onClick={handleClose}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/80 backdrop-blur-sm transition-colors hover:bg-red-500/70 hover:text-white"
-            title="Close player — stops the stream"
-            aria-label="Close player"
+            title={t('theater.closeStops')}
+            aria-label={t('theater.close')}
           >
             <CloseIcon />
           </button>
@@ -278,7 +280,7 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
           <div className="flex items-center gap-1">
             {/* Skip back 10s */}
             {isVod && (
-              <ControlButton onClick={handleSkipBack} title="Back 10s (Left)">
+              <ControlButton onClick={handleSkipBack} title={t('theater.back10')}>
                 <SkipBackIcon />
               </ControlButton>
             )}
@@ -298,7 +300,7 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
 
             {/* Skip forward 10s */}
             {isVod && (
-              <ControlButton onClick={handleSkipForward} title="Forward 10s (Right)">
+              <ControlButton onClick={handleSkipForward} title={t('theater.forward10')}>
                 <SkipForwardIcon />
               </ControlButton>
             )}
@@ -338,7 +340,7 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
                 when no embedded tracks exist */}
             <ControlButton
               onClick={() => openSettings('subtitles')}
-              title="Subtitles (S)"
+              title={t('theater.subtitles')}
               active={hasSubtitles && subtitleTracks.some((t) => t.selected)}
             >
               <SubtitleIcon />
@@ -346,7 +348,7 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
 
             {/* Audio tracks */}
             {hasMultipleAudio && (
-              <ControlButton onClick={() => openSettings('audio')} title="Audio tracks">
+              <ControlButton onClick={() => openSettings('audio')} title={t('theater.audioTracks')}>
                 <AudioTrackIcon />
               </ControlButton>
             )}
@@ -356,7 +358,7 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
               onClick={() => {
                 takeScreenshot();
               }}
-              title="Screenshot"
+              title={t('theater.screenshot')}
             >
               <CameraIcon />
             </ControlButton>
@@ -382,7 +384,7 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
             </button>
 
             {/* Settings gear — full panel, defaults to Info tab */}
-            <ControlButton onClick={toggleSettings} title="Settings (G)">
+            <ControlButton onClick={toggleSettings} title={t('theater.settings')}>
               <SettingsIcon />
             </ControlButton>
 

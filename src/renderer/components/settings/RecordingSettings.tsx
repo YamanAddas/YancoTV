@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
+import { useT } from '../../i18n';
 import {
   PageHeading,
   SectionHeading,
@@ -18,6 +19,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export function RecordingSettings() {
+  const t = useT();
   const { get, set, load, loaded } = useSettingsStore();
   const [resolvedPath, setResolvedPath] = useState<string>('');
   const [ffmpegOk, setFfmpegOk] = useState<boolean | null>(null);
@@ -59,7 +61,7 @@ export function RecordingSettings() {
 
   return (
     <div className="space-y-6">
-      <PageHeading title="Recording" subtitle="Where recordings are saved and how many can run at once" />
+      <PageHeading title={t('settingsTab.recording')} subtitle={t('recording.desc')} />
 
       {ffmpegOk === false && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
@@ -73,14 +75,14 @@ export function RecordingSettings() {
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
           <div>
-            <p className="text-sm font-medium text-surface-200">Save location</p>
+            <p className="text-sm font-medium text-surface-200">{t('downloads.saveLocation')}</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Recordings are written as MP4 files into this folder.
             </p>
           </div>
           <PathPicker
             value={resolvedPath}
-            placeholder="Choose a folder"
+            placeholder={t('downloads.chooseFolder')}
             onPick={pickDirectory}
             onReveal={openFolder}
             revealLabel="Open folder"
@@ -94,8 +96,8 @@ export function RecordingSettings() {
         <SectionHeading>Limits</SectionHeading>
 
         <SettingRow
-          label="Concurrent recordings"
-          description="Maximum number of recordings that can run simultaneously"
+          label={t('recording.concurrent')}
+          description={t('recording.concurrentDesc')}
         >
           <Select
             value={get('recording_max_concurrent')}
@@ -112,14 +114,14 @@ export function RecordingSettings() {
         </SettingRow>
 
         <SettingRow
-          label="Maximum recording length"
-          description="Automatically stop recordings that exceed this limit"
+          label={t('recording.maxLength')}
+          description={t('recording.maxLengthDesc')}
         >
           <Select
             value={get('recording_max_duration_minutes')}
             onChange={(v) => set('recording_max_duration_minutes', v)}
             options={[
-              { value: '0', label: 'No limit' },
+              { value: '0', label: t('value.noLimit') },
               { value: '60', label: '1 hour' },
               { value: '120', label: '2 hours' },
               { value: '180', label: '3 hours' },
@@ -136,7 +138,7 @@ export function RecordingSettings() {
         <SectionHeading>Format</SectionHeading>
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
-          <p className="text-sm font-medium text-surface-200">Container</p>
+          <p className="text-sm font-medium text-surface-200">{t('recording.container')}</p>
           <p className="mt-0.5 text-xs text-surface-500">
             Recordings are stored as MP4 using stream copy — no re-encoding,
             so the file preserves the source quality at minimal CPU cost.

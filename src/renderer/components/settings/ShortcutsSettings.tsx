@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
+import { useT } from '../../i18n';
 import {
   SHORTCUT_DEFS,
   SHORTCUTS_SETTING_KEY,
@@ -49,6 +50,7 @@ function RebindButton({
   onRebind: (key: string) => void;
   bindings: Record<ShortcutAction, string>;
 }) {
+  const t = useT();
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -121,7 +123,7 @@ function RebindButton({
         setListening(true);
       }}
       className="flex min-w-[7rem] items-center justify-center rounded-md border border-surface-700/50 bg-surface-800/40 px-3 py-1 text-xs font-mono text-surface-300 transition-colors hover:border-accent/40 hover:bg-surface-800/70 hover:text-surface-100"
-      title="Click to rebind"
+      title={t('shortcuts.clickToRebind')}
     >
       {formatKeyLabel(currentKey)}
     </button>
@@ -198,6 +200,7 @@ function FixedSection({
 }
 
 export function ShortcutsSettings() {
+  const t = useT();
   const rawBindings = useSettingsStore((s) => s.data[SHORTCUTS_SETTING_KEY] ?? '');
   const setSetting = useSettingsStore((s) => s.set);
 
@@ -217,7 +220,7 @@ export function ShortcutsSettings() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-surface-100">
-            Keyboard Shortcuts
+            {t('settingsTab.shortcuts')}
           </h2>
           <p className="mt-1 text-sm text-surface-500">
             Click any key to rebind. Press Escape during capture to cancel.
@@ -228,24 +231,24 @@ export function ShortcutsSettings() {
           onClick={resetAll}
           className="shrink-0 rounded-md border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-xs text-surface-300 transition-colors hover:border-accent/40 hover:text-surface-100"
         >
-          Reset all
+          {t('shortcuts.resetAll')}
         </button>
       </div>
 
       <RebindableSection
-        title="Playback"
+        title={t('settingsTab.playback')}
         group="playback"
         bindings={bindings}
         onUpdate={updateBinding}
       />
       <RebindableSection
-        title="Navigation"
+        title={t('shortcuts.navigation')}
         group="navigation"
         bindings={bindings}
         onUpdate={updateBinding}
       />
-      <FixedSection title="Fixed (non-rebindable)" items={FIXED_SHORTCUTS} />
-      <FixedSection title="App navigation" items={NAV_SHORTCUTS} />
+      <FixedSection title={t('shortcuts.fixed')} items={FIXED_SHORTCUTS} />
+      <FixedSection title={t('shortcuts.appNavigation')} items={NAV_SHORTCUTS} />
 
       <div className="rounded-lg border border-surface-700/50 bg-surface-900/30 px-4 py-3">
         <p className="text-xs text-surface-500">

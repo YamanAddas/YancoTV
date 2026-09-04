@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { usePlayerStore } from '../../../stores/player-store';
 import { DelayControl } from '../SettingsPanel';
 import { guessTitle } from '../../../utils/guess-title';
+import { useT } from '../../../i18n';
 
 /**
  * Three subtitle sources, in the order a user usually wants to try them:
@@ -12,6 +13,7 @@ import { guessTitle } from '../../../utils/guess-title';
 type SubSection = 'embedded' | 'local' | 'opensubtitles';
 
 export function SubtitlesTab() {
+  const t = useT();
   const subtitleTracks = usePlayerStore((s) => s.subtitleTracks);
   const subtitleDelay = usePlayerStore((s) => s.subtitleDelay);
   const backend = usePlayerStore((s) => s.backend);
@@ -34,7 +36,7 @@ export function SubtitlesTab() {
           onClick={() => setSection('embedded')}
           badge={subtitleTracks.length || undefined}
         >
-          In stream
+          {t('subsTab.inStream')}
         </SectionTab>
         <SectionTab
           active={section === 'local'}
@@ -64,8 +66,8 @@ export function SubtitlesTab() {
 
       {/* Subtitle delay — applies to whichever track is active */}
       <DelayControl
-        label="Subtitle Delay"
-        hint="Negative = earlier, Positive = later"
+        label={t('subsTab.delay')}
+        hint={t('subsTab.delayHint')}
         value={subtitleDelay}
         onReset={() => setSubtitleDelay(0)}
         onStep={(d) => adjustSubtitleDelay(d)}
@@ -119,11 +121,12 @@ function EmbeddedSection({
   onSelect: (id: number) => void;
   onToggle: () => void;
 }) {
+  const t = useT();
   if (tracks.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-surface-700 bg-surface-800/40 px-3 py-4 text-center">
-        <p className="text-sm text-surface-400">No embedded subtitles in this stream.</p>
-        <p className="mt-1 text-xs text-surface-500">Try the File or OpenSubtitles tab.</p>
+        <p className="text-sm text-surface-400">{t('subsTab.noEmbedded')}</p>
+        <p className="mt-1 text-xs text-surface-500">{t('subsTab.tryOther')}</p>
       </div>
     );
   }
@@ -135,7 +138,7 @@ function EmbeddedSection({
         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-surface-300 transition-colors hover:bg-surface-800"
       >
         <EyeIcon />
-        <span>Toggle on/off (S)</span>
+        <span>{t('subsTab.toggle')}</span>
       </button>
       {tracks.map((track) => (
         <button
@@ -226,6 +229,18 @@ interface OsResult {
   };
 }
 
+// Endonyms, deliberately NOT translated.
+//
+// This is a subtitle-SEARCH language list: the user is picking which language of
+// subtitle to look for, and the convention — already followed here for Arabic,
+// Russian, Japanese, Korean and Chinese — is to name each language in its own
+// script. Half of this list was briefly converted to translated names during the
+// i18n pass, which is worse than either choice: "العربية" beside "الإنجليزية"
+// reads as two different kinds of thing.
+//
+// The app's own interface-language picker uses endonyms for the same reason.
+// The settings tabs translate language names because there they are prose
+// ("Preferred audio language: Arabic"), not a list of languages to search in.
 const LANGUAGE_OPTIONS: Array<{ code: string; label: string }> = [
   { code: 'en', label: 'English' },
   { code: 'tr', label: 'Türkçe' },
@@ -244,6 +259,7 @@ const LANGUAGE_OPTIONS: Array<{ code: string; label: string }> = [
 ];
 
 function OpenSubtitlesSection() {
+  const t = useT();
   const currentTitle = usePlayerStore((s) => s.currentTitle);
   const currentContentId = usePlayerStore((s) => s.currentContentId);
   const currentEpisodeId = usePlayerStore((s) => s.currentEpisodeId);
@@ -347,7 +363,7 @@ function OpenSubtitlesSection() {
             <button
               onClick={applyGuess}
               className="group flex min-w-0 max-w-full items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-left text-xs text-accent transition-colors hover:bg-accent/20"
-              title="Use the cleaned title"
+              title={t('subsTab.useClean')}
             >
               <SparkleIcon />
               <span className="truncate">
@@ -365,7 +381,7 @@ function OpenSubtitlesSection() {
             <button
               onClick={applyRaw}
               className="flex min-w-0 max-w-full items-center gap-1.5 rounded-lg border border-surface-700 px-2.5 py-1.5 text-left text-xs text-surface-300 transition-colors hover:bg-surface-800"
-              title="Use the original title as-is"
+              title={t('subsTab.useOriginal')}
             >
               <span className="truncate opacity-70">Original:</span>
               <span className="truncate">{guess.raw}</span>
@@ -382,7 +398,7 @@ function OpenSubtitlesSection() {
           onKeyDown={(e) => {
             if (e.key === 'Enter') runSearch();
           }}
-          placeholder="Movie / series title..."
+          placeholder={t('subsTab.titlePlaceholder')}
           className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-100 placeholder:text-surface-500 focus:border-accent focus:outline-none"
         />
         <div className="grid grid-cols-3 gap-2">

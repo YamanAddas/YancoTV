@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useT } from '../i18n';
 
 type SourceType = 'm3u_url' | 'm3u_file' | 'xtream' | 'stalker';
 
@@ -7,6 +8,7 @@ interface AddSourceFormProps {
 }
 
 export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
+  const t = useT();
   const [isOpen, setIsOpen] = useState(false);
   const [sourceType, setSourceType] = useState<SourceType>('m3u_url');
   const [name, setName] = useState('');
@@ -101,7 +103,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
-        Add Source
+        {t('source.add')}
       </button>
     );
   }
@@ -109,7 +111,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
   return (
     <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-surface-200">Add Source</h3>
+        <h3 className="text-lg font-semibold text-surface-200">{t('source.add')}</h3>
         <button
           onClick={() => {
             setIsOpen(false);
@@ -149,7 +151,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        <Input label="Name" value={name} onChange={setName} placeholder="My IPTV Source" required />
+        <Input label="Name" value={name} onChange={setName} placeholder={t('source.namePlaceholder')} required />
 
         {sourceType === 'm3u_url' && (
           <Input label="URL" value={url} onChange={setUrl} placeholder="https://example.com/playlist.m3u" required />
@@ -163,7 +165,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
                 type="text"
                 value={filePath}
                 readOnly
-                placeholder="Select an M3U file..."
+                placeholder={t('source.selectFile')}
                 className="flex-1 rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500"
               />
               <button
@@ -179,21 +181,21 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
 
         {sourceType === 'xtream' && (
           <>
-            <Input label="Server URL" value={url} onChange={setUrl} placeholder="http://provider.example.com:8080" required />
-            <Input label="Username" value={username} onChange={setUsername} required />
-            <Input label="Password" value={password} onChange={setPassword} type="password" required />
+            <Input label={t('source.serverUrl')} value={url} onChange={setUrl} placeholder="http://provider.example.com:8080" required />
+            <Input label={t('auth.username')} value={username} onChange={setUsername} required />
+            <Input label={t('auth.password')} value={password} onChange={setPassword} type="password" required />
           </>
         )}
 
         {sourceType === 'stalker' && (
           <>
-            <Input label="Portal URL" value={url} onChange={setUrl} placeholder="http://portal.example.com/stalker_portal" required />
-            <Input label="MAC Address" value={macAddress} onChange={setMacAddress} placeholder="00:1A:79:XX:XX:XX" required />
+            <Input label={t('source.portalUrl')} value={url} onChange={setUrl} placeholder="http://portal.example.com/stalker_portal" required />
+            <Input label={t('source.macAddress')} value={macAddress} onChange={setMacAddress} placeholder="00:1A:79:XX:XX:XX" required />
           </>
         )}
 
         <Input
-          label="EPG URL (optional)"
+          label={t('source.epgUrl')}
           value={epgUrl}
           onChange={setEpgUrl}
           placeholder="https://example.com/epg.xml.gz"

@@ -53,6 +53,13 @@ const MIGRATED = new Set(
     'src/renderer/components/settings/MetadataSettings.tsx',
     'src/renderer/components/settings/NetworkSettings.tsx',
     'src/renderer/components/settings/AdvancedSettings.tsx',
+    'src/renderer/components/player/settings-tabs/SubtitlesTab.tsx',
+    'src/renderer/components/player/SettingsPanel.tsx',
+    'src/renderer/components/settings/RecordingSettings.tsx',
+    'src/renderer/components/AddSourceForm.tsx',
+    'src/renderer/components/player/TheaterControls.tsx',
+    'src/renderer/components/SortDropdown.tsx',
+    'src/renderer/components/settings/ShortcutsSettings.tsx',
   ].map((p) => p.split('/').join(path.sep)),
 );
 

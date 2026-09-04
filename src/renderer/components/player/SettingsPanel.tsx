@@ -2,24 +2,28 @@ import { useState, useEffect, useRef } from 'react';
 import { usePlayerStore } from '../../stores/player-store';
 import type { SettingsTab } from '../../stores/player-store';
 import { SubtitlesTab } from './settings-tabs/SubtitlesTab';
+import { useT } from '../../i18n';
+import type { StringKey } from '../../i18n/locales/en';
 
-const TABS: { id: SettingsTab; label: string }[] = [
-  { id: 'subtitles', label: 'Subtitles' },
-  { id: 'audio', label: 'Audio' },
-  { id: 'video', label: 'Video' },
-  { id: 'speed', label: 'Speed' },
-  { id: 'info', label: 'Info' },
+// Keys, not resolved labels: module-level constants are evaluated once at
+// import and would freeze the language active at load.
+const TABS: { id: SettingsTab; labelKey: StringKey }[] = [
+  { id: 'subtitles', labelKey: 'settingsTab.subtitles' },
+  { id: 'audio', labelKey: 'player.audio' },
+  { id: 'video', labelKey: 'player.video' },
+  { id: 'speed', labelKey: 'player.speed' },
+  { id: 'info', labelKey: 'player.info' },
 ];
 
 const SPEED_PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-const ASPECT_OPTIONS: { value: string; label: string }[] = [
-  { value: 'auto', label: 'Auto' },
+const ASPECT_OPTIONS: { value: string; label: string; labelKey?: StringKey }[] = [
+  { value: 'auto', label: '', labelKey: 'value.auto' },
   { value: '16:9', label: '16:9' },
   { value: '4:3', label: '4:3' },
   { value: '21:9', label: '21:9' },
   { value: '2.35:1', label: '2.35:1' },
   { value: '1:1', label: '1:1' },
-  { value: 'fill', label: 'Fill' },
+  { value: 'fill', label: '', labelKey: 'value.fill' },
 ];
 
 const ZOOM_PRESETS = [0.75, 1, 1.15, 1.3, 1.5, 2];
@@ -29,6 +33,7 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
+  const t = useT();
   const initialTab = usePlayerStore((s) => s.settingsTab);
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -92,7 +97,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 : 'text-surface-400 hover:text-surface-200'
             }`}
           >
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
@@ -114,6 +119,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 // ---------------------------------------------------------------------------
 
 function AudioTab() {
+  const t = useT();
   const audioTracks = usePlayerStore((s) => s.audioTracks);
   const audioDelay = usePlayerStore((s) => s.audioDelay);
   const setAudioTrack = usePlayerStore((s) => s.setAudioTrack);
@@ -125,7 +131,7 @@ function AudioTab() {
     <div className="space-y-4">
       <div>
         <p className="mb-2 text-xs font-medium uppercase tracking-wider text-surface-500">
-          Audio Track
+          {t('player.audioTrack')}
         </p>
         {audioTracks.length > 1 ? (
           <div className="space-y-1">
@@ -158,8 +164,8 @@ function AudioTab() {
 
       {/* Audio delay — lip sync */}
       <DelayControl
-        label="Audio Delay"
-        hint="Negative = audio earlier, Positive = audio later"
+        label={t('player.audioDelay')}
+        hint={t('player.audioDelayHint')}
         value={audioDelay}
         onReset={() => setAudioDelay(0)}
         onStep={(d) => adjustAudioDelay(d)}
@@ -175,6 +181,7 @@ function AudioTab() {
 // ---------------------------------------------------------------------------
 
 function VideoTab() {
+  const t = useT();
   const aspectRatio = usePlayerStore((s) => s.aspectRatio);
   const videoZoom = usePlayerStore((s) => s.videoZoom);
   const setAspectRatio = usePlayerStore((s) => s.setAspectRatio);
@@ -187,7 +194,7 @@ function VideoTab() {
     <div className="space-y-4">
       <div>
         <p className="mb-2 text-xs font-medium uppercase tracking-wider text-surface-500">
-          Aspect Ratio
+          {t('player.aspectRatio')}
         </p>
         <div className="grid grid-cols-4 gap-1">
           {ASPECT_OPTIONS.map((opt) => (
@@ -200,7 +207,7 @@ function VideoTab() {
                   : 'bg-surface-800 text-surface-400 hover:text-surface-200'
               }`}
             >
-              {opt.label}
+              {opt.labelKey ? t(opt.labelKey) : opt.label}
             </button>
           ))}
         </div>
@@ -263,7 +270,7 @@ function VideoTab() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
         </svg>
-        <span>Take screenshot</span>
+        <span>{t('player.screenshot')}</span>
       </button>
     </div>
   );
@@ -274,13 +281,14 @@ function VideoTab() {
 // ---------------------------------------------------------------------------
 
 function SpeedTab() {
+  const t = useT();
   const speed = usePlayerStore((s) => s.speed);
   const setSpeed = usePlayerStore((s) => s.setSpeed);
 
   return (
     <div>
       <p className="mb-3 text-xs font-medium uppercase tracking-wider text-surface-500">
-        Playback Speed
+        {t('player.playbackSpeed')}
       </p>
       <div className="grid grid-cols-3 gap-2">
         {SPEED_PRESETS.map((preset) => (
