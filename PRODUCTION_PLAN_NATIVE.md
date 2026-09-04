@@ -3094,6 +3094,50 @@ the sidebar being expanded in one (456 px) and collapsed in the other (120 px).
 **Not verified on Fire TV.** 0.42 of a 540 dp viewport is 227 dp against the orb's 200 dp, so the
 arithmetic clears there too, but no Fire TV was reachable this session.
 
+### MB-402 — 59% of a full sync is deleting rows that are about to be rewritten — open
+
+Measured end to end on the Chromecast (sabrina: 4x Cortex-A53 @ 1.9 GHz, 32-bit, 2 GB RAM, eMMC),
+one manual sync of the owner's 274k-item Xtream account, 2026-09-03:
+
+| phase | wall clock | share |
+|---|---|---|
+| fetch account + categories | 16 s | 2.6% |
+| **`clearIfFirstWrite`** — 274,097 rows in 275 batches | **367 s** | **59%** |
+| write 273,193 rows | 205 s | 33% |
+| `finishSource` — rebuild the whole FTS index | 27 s | 4.3% |
+| finalise | 7 s | 1.1% |
+| **total** | **10 min 21 s** | |
+
+**Nothing here is a bug; it is two correct fixes composing badly.** MB-353 moved the destructive
+delete after the replacement rows are in hand, so a failed sync cannot empty the catalogue. MB-315
+broke that delete into 1000-row transactions so it cannot hold the write lock for two minutes and
+starve a favourite toggle. Each is right. Together they produce an incremental delete that is now
+the single most expensive phase of a sync — six minutes spent removing rows that are rewritten two
+minutes later.
+
+**The lead worth measuring first.** `finishSource` rebuilds the *entire* FTS index for the source in
+one `INSERT … SELECT` and that costs **27 s**. The clear removes rows from that same index
+incrementally, and an earlier investigation (in `BulkContentWriter`'s companion) attributed 62 s of
+a 110 s Fire TV clear to FTS maintenance. If a whole-index drop-and-rebuild is ~27 s while
+incremental removal is minutes, the FTS half of the clear may be avoidable outright. That earlier
+note benchmarked *unqualified vs predicated* `DELETE` (0.41 s vs 0.47 s on a 60k table) and
+concluded there was no fast path — but it did not compare *incremental deletion* against
+*drop and rebuild*, which is the question this data raises.
+
+The second half — `content` itself carrying seven indexes, i.e. ~1.9 M index insertions for a 274k
+catalogue — is untested too. `BulkContentWriter`'s header says indexes are deliberately not dropped
+because "B-tree inserts are fast"; that assumption has never been measured on eMMC.
+
+**Hardware is part of it and not all of it.** The same code runs on iOS via the same
+`SourceRepository.syncSource`, on hardware with ARM64 cores and NVMe. A 3-5x difference is expected
+before any code question arises. Six minutes of deletion is not explained by that alone.
+
+**Deliberately not fixed here.** This is the code path that emptied a 272,419-item catalogue once
+already (MB-353) and starved the write lock (MB-315). It wants its own branch, its own
+measurements, and a device soak — not a change made while another milestone is open. Measure before
+proposing: phase timers around the FTS delete and the content delete separately, then a spike that
+drops and rebuilds the index.
+
 ### What is deliberately NOT switched on, and why each needs real work
 
 Naming these here because the merge makes them *look* available. They are not.
