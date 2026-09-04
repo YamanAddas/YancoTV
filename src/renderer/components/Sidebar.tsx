@@ -3,6 +3,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSettingsStore } from '../stores/settings-store';
 import { usePlayerStore } from '../stores/player-store';
+import { useT } from '../i18n';
 import type { ContentItem } from '../../shared/types';
 import { APP_VERSION as APP_VERSION_FALLBACK } from '../../shared/constants';
 
@@ -18,17 +19,21 @@ const TYPE_ICON_KEY: Record<'live' | 'movie' | 'series', string> = {
   series: 'layers',
 };
 
+// Nav items carry a translation KEY, not a label. The label is resolved at
+// render time so switching language re-renders the sidebar rather than needing
+// a reload — and so this module-level constant, which is evaluated once at
+// import, cannot capture a stale language.
 const navItems = [
-  { path: '/home', label: 'Home', icon: 'home' },
-  { path: '/live', label: 'Live TV', icon: 'tv' },
-  { path: '/guide', label: 'TV Guide', icon: 'guide' },
-  { path: '/movies', label: 'Movies', icon: 'film' },
-  { path: '/series', label: 'Series', icon: 'layers' },
-  { path: '/favorites', label: 'Favorites', icon: 'heart' },
-  { path: '/recordings', label: 'Recordings', icon: 'record' },
-  { path: '/downloads', label: 'Downloads', icon: 'download' },
-  { path: '/settings', label: 'Settings', icon: 'settings' },
-];
+  { path: '/home', labelKey: 'nav.home', icon: 'home' },
+  { path: '/live', labelKey: 'nav.liveTv', icon: 'tv' },
+  { path: '/guide', labelKey: 'nav.guide', icon: 'guide' },
+  { path: '/movies', labelKey: 'nav.movies', icon: 'film' },
+  { path: '/series', labelKey: 'nav.series', icon: 'layers' },
+  { path: '/favorites', labelKey: 'nav.favorites', icon: 'heart' },
+  { path: '/recordings', labelKey: 'nav.recordings', icon: 'record' },
+  { path: '/downloads', labelKey: 'nav.downloads', icon: 'download' },
+  { path: '/settings', labelKey: 'nav.settings', icon: 'settings' },
+] as const;
 
 const iconMap: Record<string, string> = {
   home: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
@@ -62,6 +67,7 @@ function useClock() {
 }
 
 export function Sidebar() {
+  const t = useT();
   const [expanded, setExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<ContentItem[]>([]);
@@ -393,12 +399,15 @@ export function Sidebar() {
           }
         }}
       >
+        {/* `end` used to be `item.path === '/'`, which is always false: no
+            nav item points at '/' (the start-page redirect owns that
+            route). Typing the list `as const` surfaced it. NavLink
+            defaults `end` to false, so dropping the prop is a no-op. */}
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
-            end={item.path === '/'}
-            title={expanded ? undefined : item.label}
+            title={expanded ? undefined : t(item.labelKey)}
             data-nav-item=""
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-accent/50 ${
@@ -426,7 +435,7 @@ export function Sidebar() {
                   transition={{ duration: 0.15 }}
                   className="truncate"
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </motion.span>
               )}
             </AnimatePresence>

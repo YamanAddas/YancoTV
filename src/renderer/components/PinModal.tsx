@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useT } from '../i18n';
 
 // ---------------------------------------------------------------------------
 // PIN Verification Modal
@@ -20,7 +21,9 @@ interface PinModalProps {
   onResult: (verified: boolean) => void;
 }
 
-export function PinModal({ title = 'Enter PIN', contentId, onResult }: PinModalProps) {
+export function PinModal({ title, contentId, onResult }: PinModalProps) {
+  const t = useT();
+  const heading = title ?? t('parental.enterPin');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
@@ -33,7 +36,7 @@ export function PinModal({ title = 'Enter PIN', contentId, onResult }: PinModalP
 
   const handleVerify = useCallback(async () => {
     if (pin.length < 4) {
-      setError('PIN must be at least 4 digits');
+      setError(t('parental.pinTooShort'));
       return;
     }
 
@@ -45,12 +48,12 @@ export function PinModal({ title = 'Enter PIN', contentId, onResult }: PinModalP
       if (result.verified) {
         onResult(true);
       } else {
-        setError('Incorrect PIN');
+        setError(t('parental.pinIncorrect'));
         setPin('');
         inputRef.current?.focus();
       }
     } catch {
-      setError('Verification failed');
+      setError(t('parental.verifyFailed'));
     } finally {
       setChecking(false);
     }
@@ -58,7 +61,7 @@ export function PinModal({ title = 'Enter PIN', contentId, onResult }: PinModalP
     // correct PIN unlocks. Left out of the deps, the callback would keep the id
     // from the render that created it, so a prompt that switched targets while
     // open would unlock the previous item and leave the one on screen locked.
-  }, [pin, onResult, contentId]);
+  }, [pin, onResult, contentId, t]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -83,10 +86,10 @@ export function PinModal({ title = 'Enter PIN', contentId, onResult }: PinModalP
         </div>
 
         <h2 className="mb-1 text-center text-lg font-semibold text-surface-100">
-          {title}
+          {heading}
         </h2>
         <p className="mb-5 text-center text-sm text-surface-500">
-          Enter your PIN to continue
+          {t('parental.enterToContinue')}
         </p>
 
         <input
@@ -113,14 +116,14 @@ export function PinModal({ title = 'Enter PIN', contentId, onResult }: PinModalP
             disabled={checking}
             className="flex-1 rounded-lg border border-accent/5 bg-surface-800 px-4 py-2.5 text-sm font-medium text-surface-300 transition-colors hover:bg-surface-700 disabled:opacity-50"
           >
-            Cancel
+            {t('action.cancel')}
           </button>
           <button
             onClick={handleVerify}
             disabled={checking || pin.length < 4}
             className="flex-1 rounded-lg bg-accent shadow-glow-sm px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover hover:shadow-glow disabled:opacity-50"
           >
-            {checking ? 'Checking...' : 'Verify'}
+            {checking ? t('parental.checking') : t('parental.verify')}
           </button>
         </div>
       </div>

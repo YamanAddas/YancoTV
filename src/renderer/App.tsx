@@ -17,6 +17,7 @@ import { useSettingsStore } from './stores/settings-store';
 import { useNotifications } from './hooks/use-notifications';
 import { useRecentChannelsStore } from './stores/recent-channels-store';
 import { queryClient } from './utils/query-client';
+import { I18nProvider, isLocaleCode, LOCALES, type LocaleCode } from './i18n';
 import { usePlayerStore } from './stores/player-store';
 
 
@@ -126,6 +127,19 @@ function AppInner() {
     });
   }, []);
 
+  // Language. `lang` and `dir` go on <html>, not on a React wrapper: `dir`
+  // drives the browser's own bidi algorithm, logical CSS properties, scrollbar
+  // side and caret behaviour, and it has to be on the document root for those
+  // to apply to portals and overlays too — the player controls and the PIN
+  // modal both render outside the main tree.
+  const languageSetting = get('ui_language');
+  const locale: LocaleCode = isLocaleCode(languageSetting) ? languageSetting : 'en';
+
+  useEffect(() => {
+    document.documentElement.setAttribute('lang', locale);
+    document.documentElement.setAttribute('dir', LOCALES[locale].dir);
+  }, [locale]);
+
   // Resolve the configured start page to a route
   const startPageSetting = get('ui_start_page');
   // The `?? '/live'` fallback only covers a value that is absent from the map.
@@ -138,25 +152,27 @@ function AppInner() {
     mapped && ROUTED_START_PATHS.has(mapped) ? mapped : '/live';
 
   return (
-    <Routes>
-      <Route element={<Layout />}>
+    <I18nProvider locale={locale}>
+      <Routes>
+          <Route element={<Layout />}>
         {/* '/' redirects to the configured start page */}
-        <Route path="/" element={<Navigate to={startRoute} replace />} />
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/live" element={<LiveTvPage />} />
-        <Route path="/guide" element={<GuidePage />} />
-        <Route path="/movies" element={<MoviesPage />} />
-        <Route path="/movies/:id" element={<ContentDetailPage />} />
-        <Route path="/series" element={<SeriesPage />} />
-        <Route path="/series/:id" element={<ContentDetailPage />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/favorites" element={<FavoritesPage />} />
-        <Route path="/recordings" element={<RecordingsPage />} />
-        <Route path="/downloads" element={<DownloadsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to={startRoute} replace />} />
-      </Route>
-    </Routes>
+          <Route path="/" element={<Navigate to={startRoute} replace />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/live" element={<LiveTvPage />} />
+          <Route path="/guide" element={<GuidePage />} />
+          <Route path="/movies" element={<MoviesPage />} />
+          <Route path="/movies/:id" element={<ContentDetailPage />} />
+          <Route path="/series" element={<SeriesPage />} />
+          <Route path="/series/:id" element={<ContentDetailPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
+          <Route path="/recordings" element={<RecordingsPage />} />
+          <Route path="/downloads" element={<DownloadsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to={startRoute} replace />} />
+          </Route>
+      </Routes>
+    </I18nProvider>
   );
 }
 

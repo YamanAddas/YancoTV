@@ -12,6 +12,8 @@ import { create } from 'zustand';
 const DEFAULTS: Record<string, string> = {
   // General / UI
   ui_start_page: 'live',
+  // Interface language. 'en' or 'ar' today; see src/renderer/i18n/.
+  ui_language: 'en',
   ui_theme: 'dark',
   ui_channel_logos: '1',
   ui_confirm_on_exit: '0',

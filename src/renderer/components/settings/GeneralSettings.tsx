@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
+import { LOCALES, useT } from '../../i18n';
 
 // ---------------------------------------------------------------------------
 // General Settings — theme, startup, language, UI preferences
@@ -78,6 +79,7 @@ function Select({
 }
 
 export function GeneralSettings() {
+  const t = useT();
   const { get, getBool, set, setBool, load, loaded } = useSettingsStore();
   const [launchOnStartup, setLaunchOnStartup] = useState<boolean | null>(null);
 
@@ -177,8 +179,25 @@ export function GeneralSettings() {
         </h3>
 
         <SettingRow
-          label="Start page"
-          description="Page shown when the app launches"
+          label={t('settings.language')}
+          description={t('settings.languageDesc')}
+        >
+          <Select
+            value={get('ui_language')}
+            onChange={(v) => set('ui_language', v)}
+            // Built from the locale registry rather than a hand-written list,
+            // so adding a locale to `src/renderer/i18n/` makes it selectable
+            // without a second edit here that someone will forget.
+            options={Object.entries(LOCALES).map(([code, meta]) => ({
+              value: code,
+              label: meta.label,
+            }))}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label={t('settings.startPage')}
+          description={t('settings.startPageDesc')}
         >
           <Select
             value={get('ui_start_page')}

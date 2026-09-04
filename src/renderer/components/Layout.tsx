@@ -11,8 +11,10 @@ import { useGamepad } from '../hooks/use-gamepad';
 import { usePlayerStore } from '../stores/player-store';
 import { useParentalStore } from '../stores/parental-store';
 import { PinModal } from './PinModal';
+import { useT } from '../i18n';
 
 export function Layout() {
+  const t = useT();
   usePlayerShortcuts();
   useChannelZap();
   useGamepad();
@@ -99,7 +101,11 @@ export function Layout() {
 
       {pendingUnlock && (
         <PinModal
-          title={pendingUnlock.title ? `Unlock "${pendingUnlock.title}"` : 'Enter PIN'}
+          title={
+            pendingUnlock.title
+              ? t('parental.unlockTitle', { title: pendingUnlock.title })
+              : undefined
+          }
           contentId={pendingUnlock.contentId}
           onResult={resolveUnlock}
         />
