@@ -3094,7 +3094,7 @@ the sidebar being expanded in one (456 px) and collapsed in the other (120 px).
 **Not verified on Fire TV.** 0.42 of a 540 dp viewport is 227 dp against the orb's 200 dp, so the
 arithmetic clears there too, but no Fire TV was reachable this session.
 
-### MB-402 — 59% of a full sync is deleting rows that are about to be rewritten — open
+### MB-402 — 59% of a full sync is deleting rows that are about to be rewritten — fixed 2026-09-04
 
 Measured end to end on the Chromecast (sabrina: 4x Cortex-A53 @ 1.9 GHz, 32-bit, 2 GB RAM, eMMC),
 one manual sync of the owner's 274k-item Xtream account, 2026-09-03:
@@ -3132,11 +3132,54 @@ because "B-tree inserts are fast"; that assumption has never been measured on eM
 `SourceRepository.syncSource`, on hardware with ARM64 cores and NVMe. A 3-5x difference is expected
 before any code question arises. Six minutes of deletion is not explained by that alone.
 
-**Deliberately not fixed here.** This is the code path that emptied a 272,419-item catalogue once
-already (MB-353) and starved the write lock (MB-315). It wants its own branch, its own
-measurements, and a device soak — not a change made while another milestone is open. Measure before
-proposing: phase timers around the FTS delete and the content delete separately, then a spike that
-drops and rebuilds the index.
+**Root cause — a regression of a fix, not a new problem.** `content_fts` is an fts4 virtual
+table, and fts4 indexes no column, so `WHERE content_id IN (...)` can only be answered by scanning
+every row of the index. The schema comment on the deleted `content_ad` trigger already records this
+exact blow-up from MK.6.d — "each trigger fire scanned the entire FTS -> O(N^2) for an N-row wipe" —
+and says FTS "is now cleared explicitly in a single bulk statement". MB-315 then moved the clear
+into 1000-row batches for write-lock fairness, and in doing so put that single statement back inside
+a loop. 275 batches x 274,097 index rows is ~75M row visits: the 367 s.
+
+**Fix.** The FTS wipe is hoisted out of the loop and runs once, as `deleteFtsBySource` always
+intended; only the `content` delete stays batched, where `idx_content_source` makes each batch an
+index range scan. Lock time is not traded away: 367 s over 275 batches is ~1.3 s per batch and a
+batch's cost IS one full index scan, so the single hoisted statement holds the write lock for about
+as long as one batch already did. Ordering is unchanged and still load-bearing — the subquery reads
+`content`, so it must run before the rows go.
+
+**Evidence.**
+
+- A test asserts the FTS delete executes **once** per clear via a counting `SqlDriver`. Correctness
+  tests could never have caught this: the batched version deleted the same rows, just slowly, so
+  every existing assertion passed. The statement count is the bug, so the statement count is what is
+  asserted. **Negative control run:** with the fix reverted, that test fails; with it applied, it
+  passes.
+- A second test pins the risk the fix introduces. The hoisted statement lost its `LIMIT`, and an
+  unbounded delete on a shared table is the shape that destroys someone else's data — so a second
+  source's index rows must survive the first source's clear. It counts `content_fts` **directly**
+  rather than through `searchFts`, which CROSS JOINs to `content` and therefore cannot see an
+  orphaned index row at all; asserting through search would have passed whether the row was deleted
+  or merely stranded.
+- A scaling probe (JVM, in-memory, since removed) timed the clear at 16k / 32k / 64k rows:
+
+  | rows | before | after |
+  |---|---|---|
+  | 16,000 | 227 ms | 198 ms |
+  | 32,000 | 559 ms | 400 ms |
+  | 64,000 | 1,385 ms | 856 ms |
+
+  Growth per doubling is **x2.47 before** (exponent ~1.30) and **x2.08 after** (~1.06), and the gap
+  widens with size — 1.15x, 1.40x, 1.62x. That is the signature of removing a quadratic term.
+
+**What is NOT verified, and it is the number that matters.** No sync has been run on the Chromecast
+against the real 274k catalogue, so the 367 s has not been re-measured on hardware. The JVM probe
+runs against an in-memory database whose entire index sits in page cache; on eMMC, where the scan
+is real I/O against an index far larger than cache, the quadratic term should dominate far more
+heavily than these numbers suggest — but "should" is not a measurement. The device run was attempted
+and abandoned: the shell's focus was stuck on the Home search field and neither BACK, LEFT nor DOWN
+would move it, so the sync could not be triggered without force-stopping the app — which is exactly
+the action that damaged the catalogue once already. Trigger one manual sync and the `clear[...]`
+log line carries the answer.
 
 ### What is deliberately NOT switched on, and why each needs real work
 

@@ -204,24 +204,55 @@ class BulkContentWriter(
         // clean run cannot be told apart from one where nothing tried to write
         // — a verification attempt was wasted on exactly that.
         logger.info("clear[$sourceId]: starting (batches of $CLEAR_BATCH_ROWS)")
+
+        // MB-402 — the FTS wipe is ONE statement, outside the batch loop.
+        //
+        // `content_fts` is an fts4 virtual table, and fts4 has no index on any
+        // column: `WHERE content_id IN (...)` can only be answered by scanning
+        // every row in the index. That is the whole reason MK.6.d deleted the
+        // per-row `content_ad` trigger — the schema comment on that trigger
+        // records the same O(N**2) blow-up and says FTS "is now cleared
+        // explicitly in a single bulk statement".
+        //
+        // Putting the FTS delete inside MB-315's 1000-row loop quietly undid
+        // that: each of the 275 batches re-scanned the entire index, so a 274k
+        // catalogue paid ~75M row visits and the clear grew to 367 s — 59% of a
+        // ten-minute sync, spent deleting rows that were rewritten two minutes
+        // later.
+        //
+        // Hoisting it costs nothing in lock time. The measured 367 s over 275
+        // batches is ~1.3 s per batch, and a batch's cost IS one full index
+        // scan — so a single scan holds the write lock for about as long as one
+        // batch already did. MB-315's constraint (never hold the write lock long
+        // enough to starve a favourite toggle) is preserved, not traded away.
+        //
+        // Ordering is still FTS-before-content and still load-bearing: the
+        // subquery reads `content`, so the rows must still be there. The content
+        // loop below then removes them in bounded batches, as MB-315 requires.
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
+            driver.execute(
+                null,
+                "DELETE FROM content_fts WHERE content_id IN " +
+                    "(SELECT id FROM content WHERE source_id = ?)",
+                1,
+            ) { bindString(0, sourceId) }
+            driver.execute(null, "COMMIT", 0)
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            throw t
+        }
+
         var batches = 0
         var total = 0L
         while (batches < MAX_CLEAR_BATCHES) {
             driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
             val removed =
                 try {
-                    // FTS first, then the content rows it looked them up by.
-                    // Both statements use the same unordered `LIMIT` subquery
-                    // and nothing between them modifies `content`, so within
-                    // this transaction they resolve to the SAME batch of ids.
-                    // Reverse the order and the second statement would have no
-                    // rows left to find, orphaning that batch's FTS entries.
-                    driver.execute(
-                        null,
-                        "DELETE FROM content_fts WHERE content_id IN " +
-                            "(SELECT id FROM content WHERE source_id = ? LIMIT $CLEAR_BATCH_ROWS)",
-                        1,
-                    ) { bindString(0, sourceId) }
+                    // `content` alone now. Its `idx_content_source` makes the
+                    // LIMIT subquery an index range scan rather than a table
+                    // scan, which is why batching is cheap here and was not
+                    // cheap for the FTS table.
                     val n =
                         driver.execute(
                             null,

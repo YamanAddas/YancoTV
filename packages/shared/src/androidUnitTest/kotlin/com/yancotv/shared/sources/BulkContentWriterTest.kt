@@ -844,6 +844,106 @@ class BulkContentWriterTest {
     }
 
     /**
+     * MB-402 — the FTS wipe must run ONCE per clear, not once per batch.
+     *
+     * `content_fts` is an fts4 virtual table and fts4 indexes no column, so
+     * `WHERE content_id IN (...)` can only be answered by scanning every row in
+     * the index. Running that inside MB-315's 1000-row loop made the clear
+     * quadratic: 275 batches over a 274k catalogue each re-scanned the whole
+     * index, and the clear grew to 367 s — 59% of a ten-minute sync. The schema
+     * comment on the deleted `content_ad` trigger records the same blow-up from
+     * MK.6.d, which is what makes this a regression of a fix rather than a new
+     * discovery.
+     *
+     * Correctness alone cannot catch this: the batched version cleared the same
+     * rows, just slowly, so every existing assertion passed. The statement count
+     * IS the bug, so the statement count is what this asserts.
+     */
+    @Test
+    fun `the FTS wipe runs once per clear, not once per batch`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val client = xtreamClient()
+
+        val many = (1..(BulkContentWriter.CLEAR_BATCH_ROWS * 3 + 11)).map { liveStream(it, "Ch $it") }
+        val seed = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        seed.prepareSource("s1")
+        seed.writeLiveChunk("s1", client, many, mapOf("1" to "News"), 100L, 0L)
+        seed.finishSource("s1")
+
+        val counting = CountingDriver(database.driver)
+        val second = BulkContentWriter(counting, clock = { FIXED_NOW })
+        second.prepareSource("s1")
+        second.writeLiveChunk("s1", client, listOf(liveStream(99_001, "Only One")), mapOf("1" to "News"), 200L, 0L)
+
+        // More than three content batches were needed to drain the seed, so a
+        // per-batch FTS delete would show up as four or more here.
+        assertEquals(
+            1,
+            counting.ftsDeletes,
+            "the fts4 wipe scans the entire index; running it per batch is the O(N^2) MB-402 measured",
+        )
+        assertTrue(
+            counting.contentDeletes >= 4,
+            "guard the guard: if the content clear stopped batching, this test would pass for the " +
+                "wrong reason (was ${counting.contentDeletes} batches)",
+        )
+    }
+
+    /**
+     * The hoisted wipe lost its `LIMIT`, so it is now a single unbounded
+     * statement — and an unbounded delete on a shared table is exactly the shape
+     * that empties data belonging to someone else. The subquery is predicated on
+     * `source_id`, and this pins that: a second source's searchable rows must
+     * survive the first source's clear.
+     */
+    @Test
+    fun `clearing one source leaves another source's FTS rows searchable`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        insertSource(db, id = "s2")
+        val client = xtreamClient()
+
+        val a = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        a.prepareSource("s1")
+        a.writeLiveChunk("s1", client, listOf(liveStream(1, "Alpha Channel")), mapOf("1" to "News"), 100L, 0L)
+        a.finishSource("s1")
+
+        val b = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        b.prepareSource("s2")
+        b.writeLiveChunk("s2", client, listOf(liveStream(2, "Beta Channel")), mapOf("1" to "News"), 100L, 0L)
+        b.finishSource("s2")
+
+        assertEquals(1, db.contentQueries.searchFts("Beta", 10).executeAsList().size)
+
+        // Re-sync s1 only. s2 must be untouched in BOTH tables.
+        val again = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        again.prepareSource("s1")
+        again.writeLiveChunk("s1", client, listOf(liveStream(3, "Gamma Channel")), mapOf("1" to "News"), 200L, 0L)
+        again.finishSource("s1")
+
+        assertEquals(1L, db.contentQueries.countBySource("s2").executeAsOne())
+        assertEquals(
+            1,
+            db.contentQueries.searchFts("Beta", 10).executeAsList().size,
+            "the unbounded FTS delete must stay predicated on source_id",
+        )
+        // Counted straight out of `content_fts`, NOT through `searchFts`.
+        // `searchFts` CROSS JOINs to `content`, so an orphaned index row is
+        // invisible to it — asserting through search would pass whether the
+        // row was deleted or merely stranded, which is the failure this test
+        // exists to see. s1 now holds exactly one row (Gamma) and s2 one
+        // (Beta); anything above two is a leak.
+        assertEquals(
+            2L,
+            ftsRowCount(database.driver),
+            "a stale index row survives the clear and is invisible to search",
+        )
+    }
+
+    /**
      * A chunk carrying no rows must not trigger the clear.
      *
      * Found by a negative control, not by design: moving `clearIfFirstWrite`
@@ -1149,5 +1249,43 @@ class BulkContentWriterTest {
             !db.favoritesQueries.isFavorite(probeId).executeAsOne(),
             "Cascade must fire after abortSource — proves PRAGMA foreign_keys was re-enabled",
         )
+    }
+
+    /** Direct `content_fts` row count — see the note at its call site. */
+    private fun ftsRowCount(driver: app.cash.sqldelight.db.SqlDriver): Long =
+        driver.executeQuery(
+            null,
+            "SELECT COUNT(*) FROM content_fts",
+            { cursor ->
+                cursor.next()
+                app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0) ?: 0L)
+            },
+            0,
+        ).value
+
+    /**
+     * Counts the two DELETE shapes the clear issues, so MB-402's claim can be
+     * asserted rather than described. Delegation is by `by`, so any driver
+     * method this test does not care about keeps its real behaviour and new
+     * SqlDriver members do not silently become no-ops.
+     */
+    private class CountingDriver(
+        private val delegate: app.cash.sqldelight.db.SqlDriver,
+    ) : app.cash.sqldelight.db.SqlDriver by delegate {
+        var ftsDeletes = 0
+            private set
+        var contentDeletes = 0
+            private set
+
+        override fun execute(
+            identifier: Int?,
+            sql: String,
+            parameters: Int,
+            binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
+        ): app.cash.sqldelight.db.QueryResult<Long> {
+            if (sql.startsWith("DELETE FROM content_fts")) ftsDeletes++
+            if (sql.startsWith("DELETE FROM content WHERE id IN")) contentDeletes++
+            return delegate.execute(identifier, sql, parameters, binders)
+        }
     }
 }
