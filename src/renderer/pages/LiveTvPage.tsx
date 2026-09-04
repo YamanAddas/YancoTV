@@ -24,7 +24,6 @@ export function LiveTvPage() {
 
   // Parental controls
   const parentalSettings = useParentalStore((s) => s.settings);
-  const hiddenIds = useParentalStore((s) => s.hiddenIds);
   const lockedIds = useParentalStore((s) => s.lockedIds);
   const parentalLoaded = useParentalStore((s) => s.loaded);
   const parentalLoad = useParentalStore((s) => s.load);
@@ -65,31 +64,14 @@ export function LiveTvPage() {
     (channelsQuery.isLoading || catsQuery.isLoading) &&
     (!channelsQuery.data || !catsQuery.data);
 
-  // Filter hidden channels and optionally adult content
-  const visibleChannels = useMemo(() => {
-    let result = channels;
-
-    // Filter hidden channels
-    if (hiddenIds.size > 0) {
-      result = result.filter((ch) => !hiddenIds.has(ch.id));
-    }
-
-    // Filter adult content if enabled
-    if (parentalSettings.hideAdultContent) {
-      result = result.filter((ch) => {
-        const name = (ch.groupName || '').toLowerCase();
-        const title = (ch.title || '').toLowerCase();
-        return !(
-          name.includes('adult') ||
-          name.includes('xxx') ||
-          name.includes('18+') ||
-          title.includes('xxx')
-        );
-      });
-    }
-
-    return result;
-  }, [channels, hiddenIds, parentalSettings.hideAdultContent]);
+  // MB-404 — hidden and adult-tagged rows are filtered in the main process
+  // now, so `channels` never contains them. The copy of this logic that used to
+  // live here was the ONLY place it ran: Movies, Series, Search, Home,
+  // Favorites and the Guide each fetched their own content and filtered
+  // nothing, while the setting read "Filter out channels and VOD tagged as
+  // adult". Re-adding a client-side pass here would put that asymmetry back and
+  // duplicate a rule that now has one home (AGENTS.md rule 8).
+  const visibleChannels = channels;
 
   // Per-category channel counts for the sidebar
   const categoryCounts = useMemo(() => {

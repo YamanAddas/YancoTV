@@ -12,7 +12,7 @@ Everything above is the cross-tool guide. The rest of this file is Claude Code-s
 
 ## Tool discipline
 
-- Desktop bug fixes go in [bugs.md](bugs.md) with a `BUG-*` id. Native bugs use `MB-*` in [PRODUCTION_PLAN_NATIVE.md](PRODUCTION_PLAN_NATIVE.md).
+- Bugs go in [bugs.md](bugs.md) with an `MB-*` id, desktop and native alike — the register has never contained a `BUG-*` id, and this line used to claim desktop used one. Native bugs additionally get a write-up in [PRODUCTION_PLAN_NATIVE.md](PRODUCTION_PLAN_NATIVE.md) when they belong to an `MK.*` milestone.
 - Commits: one `MK.*` sub-task per commit on native. MK.8 shipped three sub-tasks in one commit and the bug count scaled with commit size.
 - Before committing a shell screen, self-audit against the `native-android-mk` skill checklist.
 - **Don't push** without an explicit ask. Build + install + commit is fine; `git push` is not.

@@ -85,6 +85,9 @@ import {
   setChannelOverride,
   removeChannelOverride,
   getAllChannelOverrides,
+  applyParentalVisibility,
+  applyParentalCategoryVisibility,
+  filterHiddenItem,
 } from '../services/parental-service';
 import type { ChannelOverride } from '../services/parental-service';
 import { MpvPlayer } from '../player/mpv-player';
@@ -597,26 +600,36 @@ export function registerIpcHandlers(): void {
   });
 
   // Content browsing
+  // MB-404 — every content channel that reaches the renderer is filtered here.
+  // This is the boundary, not `content-store`, precisely because backup/export
+  // and the recorder must keep seeing hidden rows; hiding a channel must not
+  // quietly drop it from the user's backup.
   ipcMain.handle(IpcChannels.CONTENT_GET_LIVE, (_event, sourceId?: string, sort?: string) => {
-    return getContentByType('live', sourceId, (sort as 'provider' | 'name-asc' | 'name-desc' | 'recent' | 'group') || 'provider');
+    return applyParentalVisibility(
+      getContentByType('live', sourceId, (sort as 'provider' | 'name-asc' | 'name-desc' | 'recent' | 'group') || 'provider'),
+    );
   });
 
   ipcMain.handle(IpcChannels.CONTENT_GET_MOVIES, (_event, sourceId?: string, sort?: string) => {
-    return getContentByType('movie', sourceId, (sort as 'provider' | 'name-asc' | 'name-desc' | 'recent' | 'group') || 'provider');
+    return applyParentalVisibility(
+      getContentByType('movie', sourceId, (sort as 'provider' | 'name-asc' | 'name-desc' | 'recent' | 'group') || 'provider'),
+    );
   });
 
   ipcMain.handle(IpcChannels.CONTENT_GET_SERIES, (_event, sourceId?: string, sort?: string) => {
-    return getContentByType('series', sourceId, (sort as 'provider' | 'name-asc' | 'name-desc' | 'recent' | 'group') || 'provider');
+    return applyParentalVisibility(
+      getContentByType('series', sourceId, (sort as 'provider' | 'name-asc' | 'name-desc' | 'recent' | 'group') || 'provider'),
+    );
   });
 
   ipcMain.handle(IpcChannels.CONTENT_GET_CATEGORIES, (_event, type: string) => {
     if (!['live', 'movie', 'series'].includes(type)) return [];
-    return getCategories(type as 'live' | 'movie' | 'series');
+    return applyParentalCategoryVisibility(getCategories(type as 'live' | 'movie' | 'series'));
   });
 
   ipcMain.handle(IpcChannels.CONTENT_SEARCH, (_event, query: string) => {
     if (!query || typeof query !== 'string') return [];
-    return searchContent(query);
+    return applyParentalVisibility(searchContent(query));
   });
 
   ipcMain.handle(IpcChannels.CONTENT_GET_EPISODES, (_event, contentId: string) => {
@@ -626,7 +639,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.CONTENT_GET_DETAIL, async (_event, id: string) => {
     if (!id || typeof id !== 'string') return null;
-    const item = getContentById(id);
+    // Hidden items are unreachable by id too. Without this, a hidden title
+    // stayed one hand-typed /movies/<id> — or one stale favourite, or one
+    // history row — away from opening its full detail page.
+    const item = filterHiddenItem(getContentById(id));
     if (!item) return null;
 
     // Parse metadata_json
@@ -723,9 +739,13 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.CONTENT_GET_RELATED, (_event, id: string) => {
     if (!id || typeof id !== 'string') return { sameGroup: [], sameSource: [] };
-    const item = getContentById(id);
+    const item = filterHiddenItem(getContentById(id));
     if (!item) return { sameGroup: [], sameSource: [] };
-    return getRelatedContent(id, item.groupName, item.sourceId, item.type);
+    const related = getRelatedContent(id, item.groupName, item.sourceId, item.type);
+    return {
+      sameGroup: applyParentalVisibility(related.sameGroup),
+      sameSource: applyParentalVisibility(related.sameSource),
+    };
   });
 
   // Favorites

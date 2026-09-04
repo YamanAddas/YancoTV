@@ -30,6 +30,11 @@ import {
   getAllChannelOverrides,
   getPinLockoutMs,
   resetPinAttempts,
+  isAdultContent,
+  isAdultGroupName,
+  applyParentalVisibility,
+  applyParentalCategoryVisibility,
+  filterHiddenItem,
 } from '../../src/main/services/parental-service';
 
 describe('Parental Service', () => {
@@ -271,6 +276,153 @@ describe('Parental Service', () => {
       setChannelOverride({ contentId: 'ch-1', customName: 'Test' });
       removeChannelOverride('ch-1');
       expect(getAllChannelOverrides()).toEqual({});
+    });
+  });
+});
+
+describe('Parental visibility (MB-404)', () => {
+  beforeEach(() => {
+    testDb = createTestDb();
+    resetPinAttempts();
+  });
+
+  const item = (id: string, title: string, groupName: string | null = null) => ({
+    id,
+    title,
+    groupName,
+  });
+
+  describe('isAdultContent', () => {
+    it('matches the markers providers actually use, in the group', () => {
+      expect(isAdultContent(item('1', 'Channel', 'ADULT 18+'))).toBe(true);
+      expect(isAdultContent(item('2', 'Channel', 'XXX'))).toBe(true);
+      expect(isAdultContent(item('3', 'Channel', 'FR - Porn'))).toBe(true);
+      expect(isAdultContent(item('4', 'Channel', 'adult movies'))).toBe(true);
+    });
+
+    it('matches an explicit marker in the title', () => {
+      expect(isAdultContent(item('5', 'Some XXX Title', 'Movies'))).toBe(true);
+      expect(isAdultContent(item('6', 'Late Night 18+', 'Movies'))).toBe(true);
+    });
+
+    /**
+     * The reason `adult` is a group-only marker. The old renderer-side filter
+     * checked `title.includes('xxx')` but not `adult`, and this pins WHY that
+     * asymmetry is right rather than an oversight: "Adulthood" and "Young
+     * Adult" are ordinary films that would disappear from a user's library with
+     * no explanation and no way to find out why.
+     */
+    it('does not treat the word adult inside an ordinary title as adult content', () => {
+      expect(isAdultContent(item('7', 'Adulthood', 'Movies'))).toBe(false);
+      expect(isAdultContent(item('8', 'Young Adult', 'DRAMA'))).toBe(false);
+      expect(isAdultContent(item('9', 'The Adult Room', 'FR - CINEMA'))).toBe(false);
+    });
+
+    it('survives null and empty fields rather than throwing', () => {
+      expect(isAdultContent({ id: 'a', title: null, groupName: null })).toBe(false);
+      expect(isAdultContent({ id: 'b' })).toBe(false);
+      expect(isAdultContent(item('c', '', ''))).toBe(false);
+    });
+
+    it('is case-insensitive', () => {
+      expect(isAdultContent(item('d', 'Channel', 'AdUlT'))).toBe(true);
+      expect(isAdultContent(item('e', 'xxx show', 'Movies'))).toBe(true);
+    });
+  });
+
+  describe('applyParentalVisibility', () => {
+    it('returns the array untouched when nothing is hidden and the filter is off', () => {
+      const items = [item('1', 'A'), item('2', 'B')];
+      // Same reference, not just equal contents: the short-circuit is what keeps
+      // this off the hot path of a six-figure browse query.
+      expect(applyParentalVisibility(items)).toBe(items);
+    });
+
+    it('removes hidden ids', () => {
+      hideChannel('2');
+      const out = applyParentalVisibility([item('1', 'A'), item('2', 'B'), item('3', 'C')]);
+      expect(out.map((i) => i.id)).toEqual(['1', '3']);
+    });
+
+    it('leaves adult content alone while the setting is off', () => {
+      const out = applyParentalVisibility([item('1', 'A', 'XXX'), item('2', 'B')]);
+      expect(out.map((i) => i.id)).toEqual(['1', '2']);
+    });
+
+    it('removes adult content once the setting is on', () => {
+      updateParentalSetting('hide_adult', true);
+      const out = applyParentalVisibility([item('1', 'A', 'XXX'), item('2', 'B', 'News')]);
+      expect(out.map((i) => i.id)).toEqual(['2']);
+    });
+
+    it('applies hiding and adult filtering together', () => {
+      updateParentalSetting('hide_adult', true);
+      hideChannel('2');
+      const out = applyParentalVisibility([
+        item('1', 'A', 'ADULT'),
+        item('2', 'B', 'News'),
+        item('3', 'C', 'News'),
+      ]);
+      expect(out.map((i) => i.id)).toEqual(['3']);
+    });
+
+    it('unhiding puts the item back', () => {
+      hideChannel('2');
+      expect(applyParentalVisibility([item('2', 'B')])).toHaveLength(0);
+      unhideChannel('2');
+      expect(applyParentalVisibility([item('2', 'B')])).toHaveLength(1);
+    });
+
+    it('handles an empty list', () => {
+      updateParentalSetting('hide_adult', true);
+      expect(applyParentalVisibility([])).toEqual([]);
+    });
+
+    /**
+     * Locking is not hiding. A locked channel must stay on screen wearing its
+     * padlock — filtering it out here would make "lock" indistinguishable from
+     * "hide" and leave the user no way to unlock it from the grid.
+     */
+    it('does not filter locked channels', () => {
+      lockChannel('1');
+      expect(applyParentalVisibility([item('1', 'A')]).map((i) => i.id)).toEqual(['1']);
+    });
+  });
+
+  describe('filterHiddenItem', () => {
+    it('passes a visible item through and nulls a hidden one', () => {
+      expect(filterHiddenItem(item('1', 'A'))?.id).toBe('1');
+      hideChannel('1');
+      expect(filterHiddenItem(item('1', 'A'))).toBeNull();
+    });
+
+    it('tolerates a null input', () => {
+      expect(filterHiddenItem(null)).toBeNull();
+    });
+
+    it('nulls an adult item when the setting is on', () => {
+      updateParentalSetting('hide_adult', true);
+      expect(filterHiddenItem(item('1', 'A', 'XXX'))).toBeNull();
+    });
+  });
+
+  describe('applyParentalCategoryVisibility', () => {
+    it('leaves categories alone while the setting is off', () => {
+      expect(applyParentalCategoryVisibility(['News', 'XXX'])).toEqual(['News', 'XXX']);
+    });
+
+    it('drops adult categories once the setting is on, so no empty group lingers', () => {
+      updateParentalSetting('hide_adult', true);
+      expect(applyParentalCategoryVisibility(['News', 'XXX', 'ADULT 18+'])).toEqual(['News']);
+    });
+
+    it('keeps a category whose name merely contains the word adult in prose', () => {
+      updateParentalSetting('hide_adult', true);
+      expect(isAdultGroupName('DRAMA')).toBe(false);
+      expect(applyParentalCategoryVisibility(['DRAMA', 'Documentary'])).toEqual([
+        'DRAMA',
+        'Documentary',
+      ]);
     });
   });
 });

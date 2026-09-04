@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { invalidateContentQueries } from '../utils/query-client';
 
 // ---------------------------------------------------------------------------
 // Parental Controls Store
@@ -92,6 +93,10 @@ export const useParentalStore = create<ParentalState>((set, get) => ({
         ...(key === 'require_pin_settings' ? { requirePinForSettings: value } : {}),
       },
     }));
+    // `hide_adult` changes what every content query returns; `require_pin_settings`
+    // does not, but invalidating on both keeps this from depending on which key
+    // happens to be visibility-bearing today.
+    invalidateContentQueries();
   },
 
   lockChannel: async (contentId: string) => {
@@ -122,6 +127,11 @@ export const useParentalStore = create<ParentalState>((set, get) => ({
       next.add(contentId);
       return { hiddenIds: next };
     });
+    // MB-404 — the main process now does the filtering, so the cached content
+    // queries are stale the instant this returns. Without this the channel
+    // stays on screen until something else happens to refetch, which reads as
+    // "Hide did nothing".
+    invalidateContentQueries();
   },
 
   unhideChannel: async (contentId: string) => {
@@ -132,5 +142,6 @@ export const useParentalStore = create<ParentalState>((set, get) => ({
       next.delete(contentId);
       return { hiddenIds: next };
     });
+    invalidateContentQueries();
   },
 }));

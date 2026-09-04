@@ -176,6 +176,96 @@ export function updateParentalSetting(key: string, value: boolean): void {
 }
 
 // ---------------------------------------------------------------------------
+// Visibility enforcement
+//
+// MB-404 — hiding and adult-filtering used to happen in the renderer, in
+// `LiveTvPage`, after `content:getLive` had already handed it the entire
+// catalogue. Three things were wrong with that:
+//
+//   1. Only Live TV applied it. Movies, Series, Search, Home, Favorites and
+//      the Guide each fetched their own content and filtered nothing, so a
+//      hidden channel or an adult title was one click away on any other page
+//      while the toggle read "Filter out channels and VOD tagged as adult".
+//   2. The main process shipped hidden rows to the renderer regardless. The
+//      filter was cosmetic; the data had already crossed the boundary.
+//   3. `parental-service` was never consulted by `content-store` at all, so
+//      there was no single place that could be made right.
+//
+// The rule now: **nothing hidden leaves the main process.** These helpers are
+// applied at the IPC boundary, which is deliberately narrower than the store
+// itself — backup/export and the recorder must still see the whole catalogue,
+// or hiding a channel would silently drop it from the user's backup.
+//
+// Locking is NOT a visibility rule and is not applied here. A locked channel
+// must stay on screen wearing its padlock; it is gated at playback instead.
+// ---------------------------------------------------------------------------
+
+/** Minimum shape these helpers need. Keeps them usable for rows and items alike. */
+interface VisibilityCandidate {
+  id: string;
+  title?: string | null;
+  groupName?: string | null;
+}
+
+// Substrings that mark a group or title as adult. Matched case-insensitively
+// against the group name, and — apart from `adult`, which appears in ordinary
+// titles like "Adulthood" — against the title too.
+const ADULT_GROUP_MARKERS = ['adult', 'xxx', '18+', 'porn'] as const;
+const ADULT_TITLE_MARKERS = ['xxx', '18+', 'porn'] as const;
+
+/**
+ * Whether an item is adult-tagged.
+ *
+ * Deliberately conservative on titles. `adult` is checked in the GROUP only:
+ * providers name groups "ADULT 18+", but a film called "Adulthood" or "Young
+ * Adult" is a false positive that would vanish from a user's library with no
+ * explanation. A group is the provider's own categorisation and is the more
+ * reliable signal, so it carries the looser marker set.
+ */
+export function isAdultContent(item: VisibilityCandidate): boolean {
+  const group = (item.groupName ?? '').toLowerCase();
+  const title = (item.title ?? '').toLowerCase();
+  return (
+    ADULT_GROUP_MARKERS.some((m) => group.includes(m)) ||
+    ADULT_TITLE_MARKERS.some((m) => title.includes(m))
+  );
+}
+
+/** Whether a group NAME is adult-tagged — used to drop empty categories. */
+export function isAdultGroupName(groupName: string): boolean {
+  const g = groupName.toLowerCase();
+  return ADULT_GROUP_MARKERS.some((m) => g.includes(m));
+}
+
+/**
+ * Remove everything the user has chosen not to see.
+ *
+ * Returns the input array unchanged when nothing is hidden and adult filtering
+ * is off — the common case, and worth the check: this runs on browse queries
+ * that can return six figures of rows.
+ */
+export function applyParentalVisibility<T extends VisibilityCandidate>(items: T[]): T[] {
+  const hideAdult = getParentalSettings().hideAdultContent;
+  const hidden = new Set(getHiddenChannelIds());
+  if (!hideAdult && hidden.size === 0) return items;
+  return items.filter(
+    (item) => !hidden.has(item.id) && !(hideAdult && isAdultContent(item)),
+  );
+}
+
+/** Single-item form. Returns null for anything the user has hidden. */
+export function filterHiddenItem<T extends VisibilityCandidate>(item: T | null): T | null {
+  if (!item) return null;
+  return applyParentalVisibility([item])[0] ?? null;
+}
+
+/** Drop adult category names so an emptied group does not linger in the sidebar. */
+export function applyParentalCategoryVisibility(names: string[]): string[] {
+  if (!getParentalSettings().hideAdultContent) return names;
+  return names.filter((n) => !isAdultGroupName(n));
+}
+
+// ---------------------------------------------------------------------------
 // Channel Locking
 // ---------------------------------------------------------------------------
 

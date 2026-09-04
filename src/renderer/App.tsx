@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
 import { HomePage } from './pages/HomePage';
 import { LiveTvPage } from './pages/LiveTvPage';
@@ -16,16 +16,10 @@ import { DownloadsPage } from './pages/DownloadsPage';
 import { useSettingsStore } from './stores/settings-store';
 import { useNotifications } from './hooks/use-notifications';
 import { useRecentChannelsStore } from './stores/recent-channels-store';
+import { queryClient } from './utils/query-client';
 import { usePlayerStore } from './stores/player-store';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30_000,
-    },
-  },
-});
+
 
 // Map setting values to route paths.
 //
