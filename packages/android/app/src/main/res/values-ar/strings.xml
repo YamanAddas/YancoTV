@@ -1115,7 +1115,7 @@
     <string name="vd_dock_up_next">التالي: %1$s</string>
     <string name="vd_next_in">يبدأ بعد %1$s</string>
     <string name="vd_play">تشغيل</string>
-    <string name="vd_pause">إيقاف مأقت</string>
+    <string name="vd_pause">إيقاف مؤقت</string>
     <string name="vd_next">التالي</string>
     <string name="vd_previous">السابق</string>
     <!-- MK.34.3 -->

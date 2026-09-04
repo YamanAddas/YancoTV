@@ -744,6 +744,29 @@ private fun VodDockTransportRow(
     val glass = glassTokens()
     val dockShape = RoundedCornerShape(18.dp)
     val dock = dockMetrics()
+    // MK.38.4 — the skip amount is a NUMBER, and Arabic writes numbers with
+    // Arabic-Indic digits. These two labels were the only hardcoded ASCII
+    // numerals left on the dock, so an Arabic viewer read "-10" sitting beside
+    // a clock reading "٨:٠٣" — same row, same glance. NumberFormat resolves it
+    // through the active locale and leaves en/es/fr byte-identical.
+    //
+    // The value comes from SeekAccelerator.BASE_STEP_SEC, which is what the
+    // buttons actually seek by: the literal "10" was true only for as long as
+    // nobody changed that constant, and a button that misstates its own step is
+    // worse than one with the wrong digits.
+    //
+    // The locale comes from the Configuration, NOT from `Locale.getDefault()`.
+    // LocaleController applies the in-app language by wrapping the Activity's
+    // base Context, so the Configuration is the thing that actually resolved
+    // every string on this screen; the process default is a separate value that
+    // happens to agree most of the time, and "most of the time" is how a
+    // localisation bug survives a test.
+    val locales = LocalConfiguration.current.locales
+    val skipDigits = remember(locales) {
+        dockSkipLabelDigits(SeekAccelerator.BASE_STEP_SEC, locales[0])
+    }
+    val skipBackLabel = "-" + skipDigits
+    val skipForwardLabel = "+" + skipDigits
     // MK.34.9 — pinned LTR with the ribbon above it. -10 / +10 / next are
     // directional controls bound to a timeline that does not mirror, so
     // reversing them would put +10 on the left of a bar that still fills
@@ -786,7 +809,7 @@ private fun VodDockTransportRow(
                                     onUserInteraction()
                                     onSkipBack()
                                 },
-                            ) { tint -> DockLabel("-10", tint, 9.sp) }
+                            ) { tint -> DockLabel(skipBackLabel, tint, 9.sp) }
 
                         DockControl.PLAY_PAUSE ->
                             HexControl(
@@ -807,7 +830,7 @@ private fun VodDockTransportRow(
                                     onUserInteraction()
                                     onSkipForward()
                                 },
-                            ) { tint -> DockLabel("+10", tint, 9.sp) }
+                            ) { tint -> DockLabel(skipForwardLabel, tint, 9.sp) }
 
                         DockControl.NEXT ->
                             HexControl(
