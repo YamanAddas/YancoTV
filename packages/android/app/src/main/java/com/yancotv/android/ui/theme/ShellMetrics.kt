@@ -154,11 +154,15 @@ data class ShellMetrics(
      * absurd on a tablet. iOS derives it the same way (`max(2, width / 132)`),
      * which is why an iPhone shows two columns and a Pro Max shows three.
      *
-     * [GRID_TARGET] is smaller than the iOS 132 on purpose — at 132 a phone
-     * lands on three columns of 115 dp tiles, which the owner looked at on a
-     * real device and called too big. At 88 the same phone gets four of 84 dp, and a
-     * 320 dp phone gets three of 88 dp — near-identical tiles on both, which is
-     * the point: a wider screen should show MORE tiles, not bigger ones.
+     * [GRID_TARGET] tracks the iOS 132 closely rather than undercutting it. A
+     * first attempt at 88 gave a 411 dp phone **four** columns, and that was
+     * worse than the size it was trying to fix: at four columns a channel name
+     * has ~84 dp to live in, so almost every one truncated and the rows read as
+     * a wall of clipped text — "زحمة ومشرشح". The reference build shows three,
+     * with room for the name.
+     *
+     * At 120 a 411 dp phone gets three columns of 115 dp and a 430 dp one three
+     * of 121 dp, which is what the reference actually draws.
      */
     val gridColumns: Int get() {
         val usable = lane - pageInset * 2
@@ -194,7 +198,7 @@ data class ShellMetrics(
 }
 
 /** Target edge for one browse-grid cell; the column count falls out of it. */
-private val GRID_TARGET = 88.dp
+private val GRID_TARGET = 120.dp
 
 // ───── The window-shape rules ─────
 //

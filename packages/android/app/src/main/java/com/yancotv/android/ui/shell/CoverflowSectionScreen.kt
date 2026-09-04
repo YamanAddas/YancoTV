@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -1977,7 +1978,14 @@ private fun ContentOrb(
             color = if (isCenter) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextSecondary,
             style = if (isCenter) YancoType.LabelStrong else YancoType.Label,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            overflow = TextOverflow.Clip,
+            // MK.37.C.3 — a name too long for its tile travels instead of being
+            // chopped. Provider channel names run long and similar
+            // ("3Cat Exclusiu 1/2/3", "AR| KIDS 4K ▶ أطفال"), so an ellipsis
+            // removes the part that distinguishes them and a grid of them reads
+            // as a wall of clipped text. The reference build marquees for the
+            // same reason.
+            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
         )
         // Secondary line: EPG now-title for LIVE, facts otherwise.
         //

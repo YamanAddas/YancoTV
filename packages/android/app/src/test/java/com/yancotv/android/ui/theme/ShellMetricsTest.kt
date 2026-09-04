@@ -169,32 +169,52 @@ class ShellMetricsTest {
     // ───── The browse grid ─────
 
     /**
-     * The bug the owner caught on a real phone: the grid was pinned at three
-     * columns, so tile size swung with the screen instead of the count doing.
-     * A tile should be about the same size everywhere; a wider screen should
-     * show MORE of them.
+     * The grid's column count is derived, never fixed — the bug this replaced
+     * was a hard-coded three, which made *tile size* swing with the screen
+     * instead of the count doing.
+     *
+     * The band deliberately excludes the smallest phone: a 320 dp screen hits
+     * the two-column floor and lands at 138 dp, which is what the reference
+     * build does on a small iPhone. Everything from a normal phone upward sits
+     * within a few points.
      */
     @Test
-    fun `grid tiles stay about the same size across every screen`() {
+    fun `grid tiles stay about the same size from a normal phone upward`() {
         val screens = listOf(
-            metrics(320, 568), metrics(411, 869), metrics(430, 932),
-            metrics(708, 1280), metrics(868, 540),
+            metrics(411, 869), metrics(430, 932), metrics(708, 1280), metrics(868, 540),
         )
         for (m in screens) {
             assertTrue(
                 "cell ${m.gridCell} on a ${m.lane} lane is outside the comfortable band",
-                m.gridCell >= 70.dp && m.gridCell <= 100.dp,
+                m.gridCell >= 110.dp && m.gridCell <= 128.dp,
             )
         }
     }
 
+    /**
+     * Three columns on a normal phone, not four.
+     *
+     * A first attempt targeted 88 dp and gave four, which was worse than the
+     * size it set out to fix: a channel name had ~84 dp to live in, so almost
+     * every one truncated and the rows read as a wall of clipped text. Provider
+     * names run long and similar — "3Cat Exclusiu 1/2/3" — so an ellipsis eats
+     * exactly the part that tells them apart.
+     */
+    @Test
+    fun `a normal phone gets three columns`() {
+        assertEquals(3, metrics(411, 869).gridColumns)
+        assertEquals(3, metrics(430, 932).gridColumns)
+    }
+
     @Test
     fun `a wider screen gets more columns, not bigger tiles`() {
-        val small = metrics(320, 568)
         val phone = metrics(411, 869)
         val tablet = metrics(708, 1280)
-        assertTrue(small.gridColumns < phone.gridColumns)
         assertTrue(phone.gridColumns < tablet.gridColumns)
+        assertTrue(
+            "tablet cell ${tablet.gridCell} should not balloon past the phone's ${phone.gridCell}",
+            tablet.gridCell <= phone.gridCell + 12.dp,
+        )
     }
 
     @Test

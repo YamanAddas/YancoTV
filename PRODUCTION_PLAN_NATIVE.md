@@ -3388,6 +3388,43 @@ more tiles, not bigger ones. On the test phone the tile went 127 dp to 96 dp and
 
 Fire TV re-checked after the change: `Home [40,160][160,264]`, no grid composed, 0 fatals.
 
+### MK.37.C.3 — three columns, and names that do not get chopped — shipped 2026-09-04
+
+MK.37.C.2 fixed the wrong thing. Told the tiles were too big, it drove the column target down to
+88 dp, which gave a 411 dp phone **four** columns — and that was worse than the size it set out to
+fix. At four columns a channel name has about 84 dp to live in, so nearly every one truncated:
+`2GB Sydney`, `3AW Melb…`, `3Cat Excl…` sitting shoulder to shoulder read as a wall of clipped text.
+The owner's word for it was "زحمة ومشرشح" — crowded and ragged — against a reference build that is
+"glassy ومرتب اكتر".
+
+Two things were actually wrong, and neither was the tile size.
+
+**The column target was undercutting the reference.** iOS targets 132 and shows three columns on the
+phone in the screenshots. 88 was chosen to make tiles smaller and instead made them narrower, which
+is not the same thing. The target is 120 now: three columns of 115 dp on a 411 dp phone, three of
+121 dp on a 430 dp one — what the reference actually draws.
+
+**Names were being chopped rather than travelling.** The reference uses `MarqueeText` for the orb
+title; this port used `maxLines = 1` with an ellipsis. That matters more here than in most apps
+because provider channel names are long *and* near-identical — `3Cat Exclusiu 1 / 2 / 3` differ only
+in the character an ellipsis removes first. The title now uses `basicMarquee`, so a name too long
+for its tile travels and the row stays legible.
+
+Measured on the Pixel XL after the change: three columns, and the names render whole —
+`2GB Sydney`, `3AW Melbourne`, `3Cat Exclusiu 1`, `3Cat Exclusiu 2`, `3Cat Exclusiu 3` all
+distinguishable, where the previous build showed them run together and clipped.
+
+The grid tests moved with the intent rather than being widened to pass: one now asserts a normal
+phone gets **three** columns and carries the four-column mistake in its comment, and the size band
+excludes the 320 dp phone explicitly, because the two-column floor puts it at 138 dp — which is what
+the reference does on a small iPhone too.
+
+Fire TV re-checked: `Home [40,160][160,264]`, `Live TV [40,268][160,372]`, 0 fatals.
+
+**Still open:** the surface itself. The reference reads glassier — a softer bed under the artwork and
+more air between rows — and this slice changed geometry and text, not the material. That is worth a
+look of its own rather than being folded in here.
+
 ### MK.37.D — Home sized from the lane it has — shipped 2026-09-04
 
 Home's rails, hero and gutter were the last surfaces still drawing at Fire TV numbers. A rail tile
