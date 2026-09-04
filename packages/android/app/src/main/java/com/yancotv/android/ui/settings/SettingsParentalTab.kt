@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -259,13 +260,33 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
 
         // Hidden-channels manager. Hide is one-way from list screens —
         // without this panel there's no way to unhide except reinstalling.
+        //
+        // MB-403 — when nothing is hidden this panel holds no focusable child:
+        // the "Unhide all" button is gated on `hiddenIds`, the row list on
+        // `hiddenItems`, and what is left is two Text nodes. On a television
+        // that makes the panel UNREACHABLE. Scrolling here is driven by focus
+        // traversal, not by a finger, so D-pad DOWN from the adult-content
+        // toggle has nowhere to go, the scroll never advances, and the panel
+        // stays below the fold no matter how long DOWN is held. Touch devices
+        // hide the bug completely — a drag scrolls the pane whether or not
+        // anything in it can take focus, which is why this reproduced on the
+        // Fire TV and not on the phone.
+        //
+        // Making the panel itself focusable gives traversal a target, and the
+        // focus-scroll spec then brings it into view. It is added only when
+        // the panel is otherwise inert: with hidden channels present the
+        // button and rows are real focus stops, and an outer focusable node
+        // would just add a dead stop in front of them (the failure mode
+        // SettingsBackupTab documents at its own `.focusable()` sites).
+        val hiddenPanelIsInert = hiddenIds.isEmpty()
         Column(
             modifier =
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
                 .background(LocalYancoPalette.current.BackgroundRaised)
-                .padding(16.dp),
+                .padding(16.dp)
+                .then(if (hiddenPanelIsInert) Modifier.focusable() else Modifier),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

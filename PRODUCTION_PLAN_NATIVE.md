@@ -3749,6 +3749,35 @@ it. And an `adb install` whose output is not printed is not a confirmed install.
 re-measurement here returned byte-identical numbers, which is the signature of measuring the old
 build, not of an ineffective change. Install to one device with `adb -s`, and print the result.
 
+### MB-403 — the hidden-channels panel was unreachable on a television — fixed 2026-09-04
+
+Reported from the sofa: in Settings → Parental, DOWN stopped at "Hide adult-tagged content" and the
+panel beneath it never came up.
+
+Scrolling in a settings tab is driven by **focus traversal**, not by a finger. When nothing is
+hidden, the hidden-channels panel holds no focusable child — the "Unhide all" button is gated on
+`hiddenIds`, the row list on `hiddenItems`, and what remains is two `Text` nodes. So D-pad DOWN from
+the adult toggle had nowhere to go, the scroll never advanced, and the panel stayed below the fold
+however long DOWN was held. The tab's `verticalScroll` was present and correct the whole time; a
+scroll container is not reachable just because it exists.
+
+Measured before: focus reached `[863,750][1769,940]` and then **five further DOWN presses moved
+nothing**. After: the fourth press moves focus to `[904,827][1728,936]` and "No channels are hidden"
+scrolls into view at y=880..936.
+
+The panel is made focusable **only while it is inert**. With hidden channels present the button and
+rows are real focus stops, and an outer focusable node would add a dead stop in front of them —
+the failure `SettingsBackupTab` documents at its own `.focusable()` sites. That branch is correct by
+construction but was **not** exercised on a device; hiding a channel and re-walking the tab is worth
+doing before this pattern is copied anywhere else.
+
+**Why touch testing could never have found this.** A drag scrolls a pane whether or not anything in
+it can take focus, so the phone sweep walked to the end of Parental and reported it healthy. Two
+earlier detectors in this same investigation also reported healthy for their own reasons (stale tap
+coordinates; BACK handing focus to the sidebar so DOWN counted sidebar movement). Three green
+results, one real bug — **on a TV the question is not "does the content scroll" but "can focus get
+there"**, and only a D-pad walk answers it.
+
 ### Remaining slices
 
 | Slice | Scope |
