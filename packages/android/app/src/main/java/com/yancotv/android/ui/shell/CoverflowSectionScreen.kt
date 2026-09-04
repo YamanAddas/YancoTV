@@ -1610,9 +1610,12 @@ private fun ContentGrid(
     onLastVisible: (Int) -> Unit,
 ) {
     val metrics = LocalShellMetrics.current
-    val columns = 3
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val cell = (maxWidth - metrics.pageInset * 2 - Space.md * (columns - 1)) / columns
+    // Both derived from the lane — never a fixed count. Three columns is right
+    // on a 411 dp phone, cramped on a 320 dp one and absurd on a tablet, and
+    // hard-coding it was the very mistake `ShellMetrics` exists to remove.
+    val columns = metrics.gridColumns
+    val cell = metrics.gridCell
+    run {
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
             modifier = Modifier.fillMaxSize(),
@@ -1642,10 +1645,10 @@ private fun ContentGrid(
                     onActivate = { onActivate(index) },
                     onLongPress = { onLongPress(item) },
                     art = cell,
-                    // Art plus the two label lines, rather than the wheel's
-                    // fixed 200 dp band — which is what clipped the caption off
-                    // every orb in MB-401.
-                    slot = cell + 64.dp,
+                    // Art plus a label block that scales with the cell, rather
+                    // than the wheel's fixed 200 dp band — a constant block is
+                    // what clipped the caption off every orb in MB-401.
+                    slot = cell + metrics.gridLabelBlock,
                 )
                 // The grid has no centred item to page from, so depth reached
                 // IS the trigger — the same signal the wheel derives from its

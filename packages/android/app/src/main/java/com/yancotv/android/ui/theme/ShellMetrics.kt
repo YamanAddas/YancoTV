@@ -145,7 +145,43 @@ data class ShellMetrics(
      */
     val categoryPanel: Dp get() = (lane * 0.30f).coerceIn(168.dp, ShellDim.categoriesPanelWidth)
 
-    /** Grid tile for the portrait browse grid, Favorites and Search results. */
+    /**
+     * How many columns the browse grid gets.
+     *
+     * **Derived, never fixed.** The first cut hard-coded three, which is the
+     * "one number for every screen" mistake this whole object exists to remove:
+     * three columns is right on a 411 dp phone, cramped on a 320 dp one and
+     * absurd on a tablet. iOS derives it the same way (`max(2, width / 132)`),
+     * which is why an iPhone shows two columns and a Pro Max shows three.
+     *
+     * [GRID_TARGET] is smaller than the iOS 132 on purpose — at 132 a phone
+     * lands on three columns of 115 dp tiles, which the owner looked at on a
+     * real device and called too big. At 88 the same phone gets four of 84 dp, and a
+     * 320 dp phone gets three of 88 dp — near-identical tiles on both, which is
+     * the point: a wider screen should show MORE tiles, not bigger ones.
+     */
+    val gridColumns: Int get() {
+        val usable = lane - pageInset * 2
+        return kotlin.math.max(2, (usable / GRID_TARGET).toInt())
+    }
+
+    /** Edge of one browse-grid cell, once gutters and gaps are taken out. */
+    val gridCell: Dp get() {
+        val gaps = Space.md * (gridColumns - 1)
+        return (lane - pageInset * 2 - gaps) / gridColumns
+    }
+
+    /**
+     * Height a grid cell adds under its art for the title and its second line.
+     *
+     * Scales with the cell rather than sitting at a constant: two lines of type
+     * under a 60 dp tile and under a 160 dp tile are not the same proportion of
+     * the card, and a fixed block is what left the wheel's caption clipped in
+     * MB-401.
+     */
+    val gridLabelBlock: Dp get() = (gridCell * 0.42f).coerceIn(44.dp, 72.dp)
+
+    /** Grid tile for Favorites and Search results. */
     val gridTileWidth: Dp get() = (lane * 0.40f).coerceIn(140.dp, 220.dp)
 
     /** Detail-page backdrop height, as a fraction of what the window can spare. */
@@ -156,6 +192,9 @@ data class ShellMetrics(
             (windowHeight * 0.38f).coerceIn(220.dp, ShellDim.heroHeight)
         }
 }
+
+/** Target edge for one browse-grid cell; the column count falls out of it. */
+private val GRID_TARGET = 88.dp
 
 // ───── The window-shape rules ─────
 //

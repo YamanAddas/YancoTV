@@ -3355,6 +3355,39 @@ Verified on hardware:
 **Still open.** Home's rails and the detail page keep the Fire TV numbers — a Home tile is still
 770 px of a 1440 px screen. That is 37.D, and it is the last thing making portrait look stretched.
 
+### MK.37.C.2 — the browse grid derives its own column count — shipped 2026-09-04
+
+The owner looked at MK.37.C on a real phone and said the tiles were still too big, and to account
+for Android phones coming in many sizes. Both were right, and the second is the more serious: the
+grid was pinned at **three columns**. That is the exact "one number for every screen" mistake this
+milestone exists to remove, sitting inside the milestone's own new code. Three is reasonable on a
+411 dp phone, cramped on a 320 dp one and absurd on a tablet — and because the count was fixed, the
+*tile size* swung with the screen instead of the count doing.
+
+The rule now lives in `ShellMetrics` beside the others: `gridColumns` is the lane over a target edge
+floored at two, `gridCell` is what is left once gutters and gaps come out, and `gridLabelBlock`
+scales with the cell rather than sitting at a constant 64 dp.
+
+The target is **88 dp**, not the iOS 132. iOS derives its count the same way — `max(2, width / 132)`
+— which is why an iPhone shows two columns and a Pro Max three. But at that target a 411 dp Android
+phone lands on three columns of 115 dp tiles, which is what was on screen when they were called too
+big.
+
+**Measured on the Pixel XL by resizing the window, not by arithmetic:**
+
+| window | columns | tile |
+|---|---|---|
+| 320 dp | 3 | 100 dp |
+| 411 dp | 4 | 95.7 dp |
+| 440 dp | 4 | 102 dp |
+
+The tile stays within seven points across the range and the count absorbs the difference, which is
+the principle `tileWidth` already states in its own comment: past a point a wider screen should show
+more tiles, not bigger ones. On the test phone the tile went 127 dp to 96 dp and the visible count
+9 to 16.
+
+Fire TV re-checked after the change: `Home [40,160][160,264]`, no grid composed, 0 fatals.
+
 ### MK.37.D — Home sized from the lane it has — shipped 2026-09-04
 
 Home's rails, hero and gutter were the last surfaces still drawing at Fire TV numbers. A rail tile

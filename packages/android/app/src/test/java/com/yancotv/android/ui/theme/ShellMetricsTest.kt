@@ -166,6 +166,42 @@ class ShellMetricsTest {
         }
     }
 
+    // ───── The browse grid ─────
+
+    /**
+     * The bug the owner caught on a real phone: the grid was pinned at three
+     * columns, so tile size swung with the screen instead of the count doing.
+     * A tile should be about the same size everywhere; a wider screen should
+     * show MORE of them.
+     */
+    @Test
+    fun `grid tiles stay about the same size across every screen`() {
+        val screens = listOf(
+            metrics(320, 568), metrics(411, 869), metrics(430, 932),
+            metrics(708, 1280), metrics(868, 540),
+        )
+        for (m in screens) {
+            assertTrue(
+                "cell ${m.gridCell} on a ${m.lane} lane is outside the comfortable band",
+                m.gridCell >= 70.dp && m.gridCell <= 100.dp,
+            )
+        }
+    }
+
+    @Test
+    fun `a wider screen gets more columns, not bigger tiles`() {
+        val small = metrics(320, 568)
+        val phone = metrics(411, 869)
+        val tablet = metrics(708, 1280)
+        assertTrue(small.gridColumns < phone.gridColumns)
+        assertTrue(phone.gridColumns < tablet.gridColumns)
+    }
+
+    @Test
+    fun `grid never drops below two columns`() {
+        assertTrue(metrics(200, 800).gridColumns >= 2)
+    }
+
     @Test
     fun `page inset never eats a small phone and never floats a large one`() {
         assertEquals(Space.lg, metrics(320, 568).pageInset)
