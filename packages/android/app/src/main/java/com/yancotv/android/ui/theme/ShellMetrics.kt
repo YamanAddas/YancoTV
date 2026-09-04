@@ -114,14 +114,25 @@ data class ShellMetrics(
     val railHeight: Dp get() = tileWidth * 9f / 16f + if (shortViewport) 72.dp else 88.dp
 
     /**
-     * Home hero. A phone in landscape has roughly 390 dp of height in total, so
-     * the portrait hero would be four fifths of the screen on its own.
+     * Home hero.
+     *
+     * **Bounded by the height as well as the lane**, which the first draft was
+     * not. `lane * 0.82` alone is right on a tall window and badly wrong on a
+     * wide short one: a Fire TV's 868 dp lane gives 712, clamped to 380 — a
+     * 60 dp jump over the 320 the shell has always drawn, and 70% of a 540 dp
+     * viewport spent on one card. Caught by arithmetic before it reached the
+     * television, not by looking at it afterwards.
+     *
+     * The height cap is the honest constraint: whatever the lane, a hero should
+     * not take more than about three fifths of the fold.
      */
     val heroHeight: Dp get() =
         if (shortViewport) {
+            // A phone in landscape has ~411 dp of height in total; the portrait
+            // hero would be four fifths of the screen on its own.
             (windowHeight * 0.50f).coerceIn(150.dp, 240.dp)
         } else {
-            (lane * 0.82f).coerceIn(220.dp, 380.dp)
+            minOf(lane * 0.82f, windowHeight * 0.60f).coerceIn(220.dp, 380.dp)
         }
 
     /**

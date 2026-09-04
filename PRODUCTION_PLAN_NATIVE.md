@@ -3355,6 +3355,46 @@ Verified on hardware:
 **Still open.** Home's rails and the detail page keep the Fire TV numbers — a Home tile is still
 770 px of a 1440 px screen. That is 37.D, and it is the last thing making portrait look stretched.
 
+### MK.37.D — Home sized from the lane it has — shipped 2026-09-04
+
+Home's rails, hero and gutter were the last surfaces still drawing at Fire TV numbers. A rail tile
+was `ShellDim.posterTile` — 220 dp, which is 53% of a 411 dp phone — so a phone rail showed one and
+a half tiles with the rest off the right edge. All of it now reads `LocalShellMetrics`.
+
+The structure was already right: Android's Home carries the same rails as the iOS one (FOR YOU,
+AGAIN, ON AIR, YOUR LIBRARY, BROWSE x2) and the same hero. Only the sizing was wrong, so this slice
+changes numbers and not composition.
+
+**A regression caught by arithmetic before it reached the television.** `heroHeight` was
+`lane * 0.82`, taken from the iOS port. That is right on a tall window and badly wrong on a wide
+short one: a Fire TV's 868 dp lane gives 712, clamped to 380 — a **60 dp jump over the 320 the shell
+has always drawn, and 70% of a 540 dp viewport spent on one card**. The formula now takes the
+smaller of `lane * 0.82` and `windowHeight * 0.60`, because whatever the lane, a hero should not
+take more than about three fifths of the fold. Two tests pin it: the Fire TV number must stay within
+20 dp of the shipped 320, and no viewport may exceed 61% of its own height.
+
+This is the failure mode `ShellMetrics` exists to prevent, reappearing inside `ShellMetrics` itself
+— a proportion derived from one axis, applied to a window whose other axis is the scarce one.
+
+**Measured on device rather than assumed.** On the Chromecast against the real catalogue:
+
+| | before | after |
+|---|---|---|
+| rail tile | 220 dp | **220 dp — unchanged** |
+| page gutter | 40 dp (`Space.section`) | 43.4 dp |
+| hero | 320 dp | 324 dp by arithmetic — neither TV's Home had `heroSlides`, so it could not be observed |
+
+The gutter is the only visible television change and it is 3.4 dp, which is the cost of one rule
+instead of a constant. Tile width — the number that would actually have shown — is identical.
+
+On the Pixel XL the rail tile is now **185 dp (647 px of 1440)**, down from 220 dp, which is
+`lane * 0.45` and exactly the iOS formula on the same lane.
+
+**Not observable this session:** the hero. Neither television's Home produced `heroSlides` (the Fire
+TV has no sources at all and the Chromecast's account showed none), and the phone's sample sources
+carry no continue-watching or EPG-now data. The arithmetic and the unit tests cover it; a device
+look is still owed.
+
 ### Remaining slices
 
 | Slice | Scope |

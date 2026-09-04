@@ -65,6 +65,7 @@ import com.yancotv.android.ui.components.ResumeBadge
 import com.yancotv.android.ui.components.WheelRow
 import com.yancotv.android.ui.components.wheelItemTransform
 import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
+import com.yancotv.android.ui.theme.LocalShellMetrics
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
@@ -500,7 +501,7 @@ fun HomeContent(
             if (isTotallyEmpty && !hasSources) {
                 EmptyHome(
                     onAddSource = onAddSource,
-                    modifier = Modifier.padding(horizontal = Space.section),
+                    modifier = Modifier.padding(horizontal = LocalShellMetrics.current.pageInset),
                 )
                 return@Column
             }
@@ -515,7 +516,7 @@ fun HomeContent(
                 BrokenSourceBanner(
                     source = brokenSource,
                     onFix = onAddSource,
-                    modifier = Modifier.padding(horizontal = Space.section),
+                    modifier = Modifier.padding(horizontal = LocalShellMetrics.current.pageInset),
                 )
                 return@Column
             }
@@ -541,7 +542,7 @@ fun HomeContent(
                 FirstSyncCard(
                     active = activeSync,
                     onOpenSources = onAddSource,
-                    modifier = Modifier.padding(horizontal = Space.section),
+                    modifier = Modifier.padding(horizontal = LocalShellMetrics.current.pageInset),
                 )
                 return@Column
             }
@@ -553,7 +554,7 @@ fun HomeContent(
                     onPlay = { slide ->
                         onPlay(listOf(slide.item), 0, resumeByContent[slide.item.id]?.episodeId)
                     },
-                    modifier = Modifier.padding(horizontal = Space.section),
+                    modifier = Modifier.padding(horizontal = LocalShellMetrics.current.pageInset),
                 )
             }
 
@@ -748,7 +749,12 @@ private fun HomeHero(slides: List<HeroSlide>, lockedIds: Set<String>, onPlay: (H
         modifier =
         modifier
             .fillMaxWidth()
-            .height(320.dp)
+            // MK.37.D — the hero is a fraction of the window, not 320 dp.
+            // 320 is 59% of a Fire TV's 540 dp viewport and reads well there;
+            // on a 731 dp phone it is 44% of the fold with the rails pushed
+            // under it, and on a phone held sideways (411 dp) it is four
+            // fifths of the screen on its own.
+            .height(LocalShellMetrics.current.heroHeight)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = { onPlay(slide) })
             // Audit catch — merge title + subhead into one TalkBack
@@ -967,7 +973,7 @@ private fun HeroCta(interaction: MutableInteractionSource, locked: Boolean) {
 
 @Composable
 private fun RailHeader(eyebrow: String, title: String, caption: String) {
-    Column(modifier = Modifier.padding(horizontal = Space.section)) {
+    Column(modifier = Modifier.padding(horizontal = LocalShellMetrics.current.pageInset)) {
         Text(
             text = eyebrow,
             color = LocalYancoPalette.current.Accent,
@@ -1005,7 +1011,7 @@ private fun PosterRail(
     Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
         RailHeader(eyebrow = eyebrow, title = title, caption = caption)
         WheelRow(
-            itemWidth = ShellDim.posterTile,
+            itemWidth = LocalShellMetrics.current.tileWidth,
             listState = listState,
             horizontalArrangement = Arrangement.spacedBy(Space.lg),
             verticalPadding = Space.lg,
@@ -1037,7 +1043,7 @@ private fun OnNowRail(items: List<NowPairing>, lockedIds: Set<String>, nowSec: L
             caption = stringResource(R.string.home_on_now_caption),
         )
         WheelRow(
-            itemWidth = ShellDim.posterTile,
+            itemWidth = LocalShellMetrics.current.tileWidth,
             listState = listState,
             horizontalArrangement = Arrangement.spacedBy(Space.lg),
             verticalPadding = Space.lg,
@@ -1069,7 +1075,7 @@ private fun UpNextRail(items: List<NowPairing>, lockedIds: Set<String>, onPlay: 
             caption = stringResource(R.string.home_up_next_caption),
         )
         WheelRow(
-            itemWidth = ShellDim.posterTile,
+            itemWidth = LocalShellMetrics.current.tileWidth,
             listState = listState,
             horizontalArrangement = Arrangement.spacedBy(Space.lg),
             verticalPadding = Space.lg,
@@ -1110,7 +1116,7 @@ private fun PosterTile(item: ContentItem, locked: Boolean, resume: HistoryEntry?
         bevelInset = 3.dp,
         modifier =
         modifier
-            .width(ShellDim.posterTile)
+            .width(LocalShellMetrics.current.tileWidth)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
             // Audit catch — name the button after the title so
@@ -1219,7 +1225,7 @@ private fun OnNowTile(pair: NowPairing, locked: Boolean, nowSec: Long, onClick: 
         bevelInset = 3.dp,
         modifier =
         modifier
-            .width(ShellDim.posterTile)
+            .width(LocalShellMetrics.current.tileWidth)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = onNowDesc },
@@ -1304,7 +1310,7 @@ private fun UpNextTile(pair: NowPairing, locked: Boolean, onClick: () -> Unit, m
         bevelInset = 3.dp,
         modifier =
         modifier
-            .width(ShellDim.posterTile)
+            .width(LocalShellMetrics.current.tileWidth)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = upNextDesc },

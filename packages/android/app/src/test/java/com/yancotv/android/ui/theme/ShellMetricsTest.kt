@@ -141,6 +141,31 @@ class ShellMetricsTest {
         assertTrue(phoneLandscape.heroHeight <= phoneLandscape.windowHeight * 0.5f)
     }
 
+    /**
+     * The regression this cap exists for. Sizing the hero from the lane alone
+     * gave the Fire TV 380 dp against the 320 the shell has always drawn — a
+     * 60 dp jump, 70% of a 540 dp viewport on one card. A wide short window is
+     * exactly where width-only reasoning fails.
+     */
+    @Test
+    fun `hero stays close to the television's own number on a wide short window`() {
+        val hero = fireTv.heroHeight
+        assertTrue(
+            "Fire TV hero was $hero; must stay near the shipped 320.dp",
+            hero <= 340.dp && hero >= 300.dp,
+        )
+    }
+
+    @Test
+    fun `hero never takes more than three fifths of the fold`() {
+        for (m in listOf(fireTv, phonePortrait, phoneLandscape, tabletPortrait, tabletLandscape)) {
+            assertTrue(
+                "hero ${m.heroHeight} of ${m.windowHeight}",
+                m.heroHeight <= m.windowHeight * 0.61f,
+            )
+        }
+    }
+
     @Test
     fun `page inset never eats a small phone and never floats a large one`() {
         assertEquals(Space.lg, metrics(320, 568).pageInset)
