@@ -34,6 +34,15 @@ interface ParentalState {
    * modal in `Layout` renders it.
    */
   pendingUnlock: { contentId: string; title?: string; resume: () => void } | null;
+  /**
+   * MB-409 — has the PIN been entered for Settings in this session?
+   *
+   * Only suppresses re-prompting. The PIN check itself stays in the main
+   * process, where it is hashed and rate-limited; this flag never decides
+   * whether a PIN was correct.
+   */
+  settingsUnlocked: boolean;
+  unlockSettings: () => void;
   requestUnlock: (req: { contentId: string; title?: string; resume: () => void }) => void;
   resolveUnlock: (verified: boolean) => void;
   removePin: () => Promise<void>;
@@ -55,6 +64,9 @@ export const useParentalStore = create<ParentalState>((set, get) => ({
   hiddenIds: new Set(),
   loaded: false,
   pendingUnlock: null,
+  settingsUnlocked: false,
+
+  unlockSettings: () => set({ settingsUnlocked: true }),
 
   requestUnlock: (req) => set({ pendingUnlock: req }),
 

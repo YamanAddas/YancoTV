@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useParentalStore } from '../stores/parental-store';
+import { PinModal } from '../components/PinModal';
+import { useT } from '../i18n';
 import { GeneralSettings } from '../components/settings/GeneralSettings';
 import { PlaylistSettings } from '../components/settings/PlaylistSettings';
 import { EpgSettings } from '../components/settings/EpgSettings';
@@ -61,7 +65,49 @@ const categories: CategoryDef[] = [
 // ---------------------------------------------------------------------------
 
 export function SettingsPage() {
+  const t = useT();
+  const navigate = useNavigate();
+  const parental = useParentalStore((s) => s.settings);
+  const parentalLoaded = useParentalStore((s) => s.loaded);
+  const parentalLoad = useParentalStore((s) => s.load);
+  const settingsUnlocked = useParentalStore((s) => s.settingsUnlocked);
+  const unlockSettings = useParentalStore((s) => s.unlockSettings);
+
+  // The gate has to know the real setting before deciding. Without this the
+  // store's defaults (pinEnabled: false) would render the page unlocked for a
+  // frame on a cold navigation, which is a gate that opens itself.
+  useEffect(() => {
+    if (!parentalLoaded) parentalLoad();
+  }, [parentalLoaded, parentalLoad]);
+
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('general');
+
+  // MB-409 — enforce "Require PIN to open Settings".
+  //
+  // The setting existed and was only ever written and read by the parental
+  // settings panel itself; nothing gated this page on it, so the toggle did
+  // nothing. Same family as MB-404 and MB-405: a parental control that was
+  // configurable but never enforced.
+  //
+  // The PIN itself is verified in the main process, which hashes and
+  // rate-limits it. `settingsUnlocked` only suppresses re-prompting for the
+  // rest of the session; it never decides whether a PIN was right.
+  const gateOn = parental.pinEnabled && parental.requirePinForSettings;
+  // Treat "not loaded yet" as locked. Failing open here would flash the whole
+  // settings surface before the gate could apply.
+  const locked = !parentalLoaded || (gateOn && !settingsUnlocked);
+
+  if (locked) {
+    return (
+      <PinModal
+        title={t('settings.pinRequired')}
+        onResult={(verified) => {
+          if (verified) unlockSettings();
+          else navigate(-1);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="glass flex h-full gap-0 overflow-hidden rounded-2xl">

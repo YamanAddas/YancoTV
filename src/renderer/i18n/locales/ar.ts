@@ -55,6 +55,7 @@ export const ar: Partial<Strings> = {
   'settings.startPageDesc': 'الصفحة التي تظهر عند فتح البرنامج',
   'settings.theme': 'المظهر',
   'settings.startup': 'بدء التشغيل',
+  'settings.pinRequired': 'الإعدادات محمية برمز',
 
   // ── empty / error states ──────────────────────────────────────────────
   'state.loading': 'جارٍ التحميل…',

@@ -151,3 +151,46 @@ describe('locked playback is gated at the funnel', () => {
     }
   });
 });
+
+/**
+ * MB-409 — "Require PIN to open Settings" must actually gate the page.
+ *
+ * The setting shipped configurable and unenforced: `requirePinForSettings` was
+ * written and read only by the parental settings panel itself, so switching it
+ * on changed nothing. Third in the same family as MB-404 (visibility filtered
+ * on one page) and MB-405 (playback gated on one screen) — a control that
+ * exists, reads correctly, and is wired to nothing.
+ */
+describe('the settings PIN gate is enforced', () => {
+  const page = readFileSync(
+    join(process.cwd(), 'src/renderer/pages/SettingsPage.tsx'),
+    'utf-8',
+  );
+
+  it('SettingsPage reads the requirePinForSettings setting', () => {
+    expect(
+      page.includes('requirePinForSettings'),
+      'SettingsPage does not consult the setting, so the toggle does nothing',
+    ).toBe(true);
+  });
+
+  it('SettingsPage renders a PIN prompt instead of the settings when locked', () => {
+    expect(page).toContain('PinModal');
+    // The early return is the load-bearing part: rendering the prompt ON TOP of
+    // the settings would leave the content mounted and readable behind it.
+    expect(
+      /if \(locked\)\s*\{\s*return \(/.test(page),
+      'the prompt must REPLACE the settings, not overlay them',
+    ).toBe(true);
+  });
+
+  it('treats an unloaded parental state as locked', () => {
+    // Store defaults are pinEnabled:false. Deciding before the real settings
+    // arrive would flash the whole settings surface on a cold navigation — a
+    // gate that opens itself.
+    expect(
+      page.includes('!parentalLoaded ||'),
+      'the gate must fail closed until the parental settings have loaded',
+    ).toBe(true);
+  });
+});

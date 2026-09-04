@@ -67,6 +67,7 @@ export const en = {
   'settings.startPageDesc': 'Page shown when the app launches',
   'settings.theme': 'Theme',
   'settings.startup': 'Startup',
+  'settings.pinRequired': 'Settings are PIN-protected',
 
   // ── empty / error states ──────────────────────────────────────────────
   'state.loading': 'Loading…',
