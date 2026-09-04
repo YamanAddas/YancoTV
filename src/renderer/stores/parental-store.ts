@@ -24,7 +24,18 @@ interface ParentalState {
   // Actions
   load: () => Promise<void>;
   setPin: (pin: string) => Promise<{ ok: boolean; error?: string }>;
-  verifyPin: (pin: string) => Promise<boolean>;
+  verifyPin: (pin: string, contentId?: string) => Promise<boolean>;
+  /**
+   * MB-405 — a playback attempt parked behind the PIN prompt.
+   *
+   * Playback starts from eight places (pages, channel zap, reminders, keyboard
+   * shortcuts, autoplay-on-launch). Each growing its own modal is how the gate
+   * ended up on the Live TV grid only, so they all park the attempt here and one
+   * modal in `Layout` renders it.
+   */
+  pendingUnlock: { contentId: string; title?: string; resume: () => void } | null;
+  requestUnlock: (req: { contentId: string; title?: string; resume: () => void }) => void;
+  resolveUnlock: (verified: boolean) => void;
   removePin: () => Promise<void>;
   updateSetting: (key: string, value: boolean) => Promise<void>;
   lockChannel: (contentId: string) => Promise<void>;
@@ -43,6 +54,17 @@ export const useParentalStore = create<ParentalState>((set, get) => ({
   lockedIds: new Set(),
   hiddenIds: new Set(),
   loaded: false,
+  pendingUnlock: null,
+
+  requestUnlock: (req) => set({ pendingUnlock: req }),
+
+  resolveUnlock: (verified: boolean) => {
+    const pending = get().pendingUnlock;
+    set({ pendingUnlock: null });
+    // Only a verified PIN resumes. Cancelling drops the attempt entirely rather
+    // than falling through to playback.
+    if (verified && pending) pending.resume();
+  },
 
   load: async () => {
     if (!window.api?.parental) return;
@@ -70,9 +92,9 @@ export const useParentalStore = create<ParentalState>((set, get) => ({
     return result;
   },
 
-  verifyPin: async (pin: string) => {
+  verifyPin: async (pin: string, contentId?: string) => {
     if (!window.api?.parental) return false;
-    const result = await window.api.parental.verifyPin(pin);
+    const result = await window.api.parental.verifyPin(pin, contentId);
     return result.verified;
   },
 

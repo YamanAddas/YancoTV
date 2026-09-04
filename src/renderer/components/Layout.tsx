@@ -9,11 +9,20 @@ import { usePlayerShortcuts } from '../hooks/use-player-shortcuts';
 import { useChannelZap } from '../hooks/use-channel-zap';
 import { useGamepad } from '../hooks/use-gamepad';
 import { usePlayerStore } from '../stores/player-store';
+import { useParentalStore } from '../stores/parental-store';
+import { PinModal } from './PinModal';
 
 export function Layout() {
   usePlayerShortcuts();
   useChannelZap();
   useGamepad();
+
+  // MB-405 — the app's one PIN prompt for locked playback. It lives here rather
+  // than on a page because playback starts from eight places (pages, channel
+  // zap, reminders, keyboard shortcuts, autoplay-on-launch); a per-page modal is
+  // exactly how the gate ended up existing on the Live TV grid alone.
+  const pendingUnlock = useParentalStore((s) => s.pendingUnlock);
+  const resolveUnlock = useParentalStore((s) => s.resolveUnlock);
 
   const mode = usePlayerStore((s) => s.mode);
   const backend = usePlayerStore((s) => s.backend);
@@ -87,6 +96,14 @@ export function Layout() {
 
       {/* Channel zap preview — shown in theater mode when PageUp/Down is pressed */}
       <ZapOverlay />
+
+      {pendingUnlock && (
+        <PinModal
+          title={pendingUnlock.title ? `Unlock "${pendingUnlock.title}"` : 'Enter PIN'}
+          contentId={pendingUnlock.contentId}
+          onResult={resolveUnlock}
+        />
+      )}
     </div>
   );
 }

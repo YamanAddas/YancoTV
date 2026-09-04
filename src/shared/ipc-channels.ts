@@ -119,6 +119,8 @@ export const IpcChannels = {
   PARENTAL_SET_OVERRIDE: 'parental:setOverride',
   PARENTAL_REMOVE_OVERRIDE: 'parental:removeOverride',
   PARENTAL_GET_OVERRIDES: 'parental:getOverrides',
+  /** MB-405 — may this item be played, or must the PIN be entered first? */
+  PARENTAL_REQUIRES_PIN: 'parental:requiresPin',
 
   // Group Preferences
   GROUP_PREFS_GET: 'groups:getPrefs',

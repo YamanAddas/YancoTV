@@ -102,10 +102,10 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.PARENTAL_GET_OVERRIDES).toBe('parental:getOverrides');
   });
 
-  it('exports exactly 150 channels', () => {
+  it('exports exactly 151 channels', () => {
     // Bumped from 147 when the mini-player redesign added
     // PLAYER_SET_PRESENTATION, PLAYER_SET_VIDEO_BOUNDS, and
     // PLAYER_MODE_BROADCAST for cross-window sync.
-    expect(Object.keys(IpcChannels)).toHaveLength(150);
+    expect(Object.keys(IpcChannels)).toHaveLength(151);
   });
 });

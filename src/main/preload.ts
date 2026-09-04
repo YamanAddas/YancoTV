@@ -112,7 +112,12 @@ const api = {
   parental: {
     getSettings: () => ipcRenderer.invoke(IpcChannels.PARENTAL_GET_SETTINGS),
     setPin: (pin: string) => ipcRenderer.invoke(IpcChannels.PARENTAL_SET_PIN, pin),
-    verifyPin: (pin: string) => ipcRenderer.invoke(IpcChannels.PARENTAL_VERIFY_PIN, pin),
+    requiresPin: (contentId?: string, streamUrl?: string) =>
+      ipcRenderer.invoke(IpcChannels.PARENTAL_REQUIRES_PIN, contentId, streamUrl),
+    // `contentId` is optional: pass it when unlocking a specific locked item so
+    // a correct PIN grants playback of THAT item for the session (MB-405).
+    verifyPin: (pin: string, contentId?: string) =>
+      ipcRenderer.invoke(IpcChannels.PARENTAL_VERIFY_PIN, pin, contentId),
     removePin: () => ipcRenderer.invoke(IpcChannels.PARENTAL_REMOVE_PIN),
     updateSetting: (key: string, value: boolean) =>
       ipcRenderer.invoke(IpcChannels.PARENTAL_UPDATE_SETTING, key, value),

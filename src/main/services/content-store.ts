@@ -732,6 +732,27 @@ export function getRelatedContent(
 }
 
 /** Find a live channel by its tvgId (for catch-up URL building) */
+/**
+ * Resolve a catalogue id from the stream URL alone.
+ *
+ * MB-405 — the parental playback gate keys on content id, but `player:play`
+ * takes `contentId` as an OPTIONAL argument. A call site that omits it would
+ * otherwise walk straight past a lock. This closes that by recovering the id
+ * from the URL, which the player always has.
+ *
+ * Returns the first match: the same stream can appear under several sources
+ * after a merge, and if ANY copy is locked the gate should engage, so the
+ * caller checks the id it gets back rather than assuming uniqueness.
+ */
+export function getContentIdByStreamUrl(streamUrl: string): string | undefined {
+  if (!streamUrl) return undefined;
+  const db = getDb();
+  const row = db
+    .prepare('SELECT id FROM content WHERE stream_url = ? LIMIT 1')
+    .get(streamUrl) as { id: string } | undefined;
+  return row?.id;
+}
+
 export function getContentByTvgId(tvgId: string): ContentItem | null {
   const db = getDb();
   const row = db

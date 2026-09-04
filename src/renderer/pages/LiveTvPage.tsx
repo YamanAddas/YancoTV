@@ -5,7 +5,6 @@ import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
 import { SortDropdown, type SortOption } from '../components/SortDropdown';
-import { PinModal } from '../components/PinModal';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useParentalStore } from '../stores/parental-store';
@@ -23,7 +22,6 @@ export function LiveTvPage() {
   const [sortBy, setSortBy] = useState<SortOption>('provider');
 
   // Parental controls
-  const parentalSettings = useParentalStore((s) => s.settings);
   const lockedIds = useParentalStore((s) => s.lockedIds);
   const parentalLoaded = useParentalStore((s) => s.loaded);
   const parentalLoad = useParentalStore((s) => s.load);
@@ -32,7 +30,6 @@ export function LiveTvPage() {
   const hideChannel = useParentalStore((s) => s.hideChannel);
 
   // PIN modal state
-  const [pinModalTarget, setPinModalTarget] = useState<ContentCardData | null>(null);
 
   useEffect(() => {
     parentalLoad();
@@ -160,33 +157,18 @@ export function LiveTvPage() {
     return out;
   }, [recentIds, visibleChannels]);
 
+  // MB-405 — no lock check here any more. `play` gates every playback attempt
+  // and raises the one PIN prompt in `Layout`, so this page no longer has to
+  // know about locking to enforce it. A local copy was what limited the gate to
+  // this grid: the same channel opened from its detail page, a favourite, a
+  // reminder or the zap keys played with no prompt at all.
   const handleItemClick = useCallback(
     (item: ContentCardData) => {
-      // If channel is locked, prompt for PIN before playing
-      if (lockedIds.has(item.id) && parentalSettings.pinEnabled) {
-        setPinModalTarget(item);
-        return;
-      }
       play(item.streamUrl, item.cleanTitle || item.title, item.id, undefined, 'live');
     },
-    [play, lockedIds, parentalSettings.pinEnabled],
+    [play],
   );
 
-  const handlePinResult = useCallback(
-    (verified: boolean) => {
-      if (verified && pinModalTarget) {
-        play(
-          pinModalTarget.streamUrl,
-          pinModalTarget.cleanTitle || pinModalTarget.title,
-          pinModalTarget.id,
-          undefined,
-          'live',
-        );
-      }
-      setPinModalTarget(null);
-    },
-    [play, pinModalTarget],
-  );
 
   const handleFavoriteToggle = useCallback(
     (item: ContentCardData) => {
@@ -374,12 +356,6 @@ export function LiveTvPage() {
       </div>
 
       {/* PIN verification modal for locked channels */}
-      {pinModalTarget && (
-        <PinModal
-          title={`Unlock "${pinModalTarget.cleanTitle || pinModalTarget.title}"`}
-          onResult={handlePinResult}
-        />
-      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getVideoElement } from '../components/player/video-ref';
 import { useRecentChannelsStore } from './recent-channels-store';
+import { useParentalStore } from './parental-store';
 
 export type PlayerMode = 'idle' | 'mini' | 'theater';
 export type PlayerBackend = 'mpv' | 'html5' | 'none';
@@ -79,6 +80,9 @@ export interface PlayerStoreState {
   controlsVisible: boolean;
   /** Used by VideoPlayer (html5 backend) to know the start position */
   _startPosition?: number;
+  /** MB-405 — set while replaying a call the PIN prompt just released, so the
+   *  gate check does not fire again and re-prompt forever. */
+  _unlockRetry?: boolean;
   /** Ephemeral preview of the channel the user is zapping to (PageUp/Down). Null when no zap is in progress. */
   zapTarget: ZapTarget | null;
 }
@@ -163,6 +167,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   showAspectMenu: false,
   controlsVisible: true,
   _startPosition: undefined,
+  _unlockRetry: false,
   zapTarget: null,
 
   // --- Actions ---
@@ -176,6 +181,43 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   ) => {
     if (!window.api) return;
     const { backend } = get();
+
+    // MB-405 — ask before playing anything.
+    //
+    // This has to live here rather than in the PLAYER_PLAY handler because the
+    // html5 backend never calls it: that path sets `currentUrl` and lets the
+    // <VideoPlayer> element load the stream in the renderer. A main-process
+    // check therefore guards mpv only. `play` is the one funnel both backends
+    // share, and every playback entry point in the app goes through it.
+    //
+    // The main process is still the authority — it refuses a locked
+    // PLAYER_PLAY independently. This call is what turns that refusal into a
+    // PIN prompt instead of an error toast.
+    if (!get()._unlockRetry) {
+      try {
+        const gate = await window.api.parental.requiresPin(contentId, url);
+        if (gate?.required && gate.contentId) {
+          useParentalStore.getState().requestUnlock({
+            contentId: gate.contentId,
+            title,
+            resume: () => {
+              // Re-enter with the same arguments. The flag stops a second gate
+              // check from re-prompting on the replay.
+              set({ _unlockRetry: true });
+              void get()
+                .play(url, title, contentId, episodeId, contentType)
+                .finally(() => set({ _unlockRetry: false }));
+            },
+          });
+          return;
+        }
+      } catch {
+        // A failed gate check must not become a way to play locked content.
+        // The main process refuses PLAYER_PLAY on its own, so mpv stays safe
+        // either way; bailing here keeps the html5 path safe too.
+        return;
+      }
+    }
 
     // Track recently-played live channels for the "recent strip", last-channel
     // recall shortcut, and auto-play-on-launch. Movies/series use watch history

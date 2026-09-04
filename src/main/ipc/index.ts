@@ -25,6 +25,7 @@ import {
   getContentById,
   getRelatedContent,
   storeXtreamEpisodes,
+  getContentIdByStreamUrl,
 } from '../services/content-store';
 import { XtreamClient } from '../services/xtream-client';
 import {
@@ -85,6 +86,8 @@ import {
   setChannelOverride,
   removeChannelOverride,
   getAllChannelOverrides,
+  requiresPinToPlay,
+  unlockForSession,
   applyParentalVisibility,
   applyParentalCategoryVisibility,
   filterHiddenItem,
@@ -983,10 +986,33 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle(IpcChannels.PARENTAL_VERIFY_PIN, (_event, pin: string) => {
-    if (!pin || typeof pin !== 'string') return { verified: false };
-    return { verified: verifyPin(pin) };
-  });
+  // MB-405 — asked by the renderer BEFORE playback starts.
+  //
+  // The PLAYER_PLAY gate alone is not enough: the html5 backend never calls it.
+  // That path sets `currentUrl` and lets the <VideoPlayer> element load the
+  // stream directly in the renderer, so a main-process check on PLAYER_PLAY
+  // protects the mpv backend only. This channel is the one both backends share.
+  ipcMain.handle(
+    IpcChannels.PARENTAL_REQUIRES_PIN,
+    (_event, contentId?: string, streamUrl?: string) => {
+      const id = contentId ?? (streamUrl ? getContentIdByStreamUrl(streamUrl) : undefined);
+      return { required: requiresPinToPlay(id), contentId: id };
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannels.PARENTAL_VERIFY_PIN,
+    (_event, pin: string, contentId?: string) => {
+      if (!pin || typeof pin !== 'string') return { verified: false };
+      const verified = verifyPin(pin);
+      // MB-405 — a correct PIN unlocks THIS item for the rest of the process.
+      // Deliberately not a global unlock: entering the PIN for one channel must
+      // not open every other locked one, and nothing is persisted so a restart
+      // re-locks everything.
+      if (verified && contentId) unlockForSession(contentId);
+      return { verified };
+    },
+  );
 
   ipcMain.handle(IpcChannels.PARENTAL_REMOVE_PIN, () => {
     try {
@@ -1108,6 +1134,17 @@ export function registerIpcHandlers(): void {
       if (!url || typeof url !== 'string') {
         return { ok: false, error: 'Invalid URL' };
       }
+
+      // MB-405 — the authoritative parental gate. Eight renderer call sites
+      // start playback (pages, channel zap, reminders, shortcuts, autoplay);
+      // gating them individually is what left every path except the Live TV
+      // grid unguarded. The id is recovered from the URL when the caller omits
+      // it, so a call site that forgets the argument cannot walk past a lock.
+      const gateId = contentId ?? getContentIdByStreamUrl(url);
+      if (requiresPinToPlay(gateId)) {
+        return { ok: false, error: 'parental-locked', contentId: gateId };
+      }
+
       try {
         // Embed mpv into the dedicated video-stage BrowserWindow (not main).
         // The main window's Chromium compositor would cover mpv's child surface;

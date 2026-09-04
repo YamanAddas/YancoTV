@@ -56,6 +56,8 @@ function writePinHash(encoded: string): void {
  * Set or update the parental PIN.
  */
 export function setPin(pin: string): void {
+  // A new or removed PIN invalidates anything unlocked under the old one.
+  clearSessionUnlocks();
   const db = getDb();
   writePinHash(encodePinScryptSync(pin));
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('parental_pin_enabled', '1')").run();
@@ -128,6 +130,8 @@ export function verifyPin(pin: string): boolean {
  * Remove the PIN and disable parental controls.
  */
 export function removePin(): void {
+  // A new or removed PIN invalidates anything unlocked under the old one.
+  clearSessionUnlocks();
   const db = getDb();
   db.prepare("DELETE FROM settings WHERE key = 'parental_pin_hash'").run();
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('parental_pin_enabled', '0')").run();
@@ -173,6 +177,58 @@ export function updateParentalSetting(key: string, value: boolean): void {
     dbKey,
     value ? '1' : '0',
   );
+}
+
+// ---------------------------------------------------------------------------
+// Playback gating (MB-405)
+//
+// Locking a channel meant "ask for the PIN before playing", and that check
+// lived in `LiveTvPage` alongside the visibility filter — so it only ran when
+// the user started playback from the Live TV grid. Opening the same title from
+// its detail page, a favourite, a reminder, the channel-zap keys or
+// autoplay-on-launch played it with no prompt at all.
+//
+// There are eight renderer call sites that start playback. Gating them one by
+// one is what produced this bug the first time, so the authority lives here and
+// is enforced in the PLAYER_PLAY handler — the single point everything funnels
+// through. The renderer still prompts for the PIN, but that is now UX: if it
+// forgets to, playback is refused rather than silently allowed.
+//
+// Unlocks are per-content and last only for the process. There is no "unlock
+// everything" — entering the PIN for one channel must not open the rest — and
+// nothing is persisted, so a restart re-locks.
+// ---------------------------------------------------------------------------
+
+const sessionUnlocked = new Set<string>();
+
+/** Grant playback of one locked item for the rest of this process's life. */
+export function unlockForSession(contentId: string): void {
+  sessionUnlocked.add(contentId);
+}
+
+/** Drop every session unlock. Called when the PIN itself changes. */
+export function clearSessionUnlocks(): void {
+  sessionUnlocked.clear();
+}
+
+export function isUnlockedForSession(contentId: string): boolean {
+  return sessionUnlocked.has(contentId);
+}
+
+/**
+ * Whether playback of this item must be refused until the PIN is entered.
+ *
+ * Fails OPEN for an unknown id on purpose: `undefined` here means playback of
+ * something with no catalogue row (a direct URL, a recording), which was never
+ * lockable. Failing closed there would block ordinary playback rather than
+ * protect anything. What must not happen is a LOCKED id slipping through, and
+ * the caller resolves the id from the stream URL before asking.
+ */
+export function requiresPinToPlay(contentId: string | undefined): boolean {
+  if (!contentId) return false;
+  if (!getParentalSettings().pinEnabled) return false;
+  if (isUnlockedForSession(contentId)) return false;
+  return isChannelLocked(contentId);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,6 +329,9 @@ export function applyParentalCategoryVisibility(names: string[]): string[] {
  * Lock a channel (requires PIN to play).
  */
 export function lockChannel(contentId: string): void {
+  // Re-locking must take effect immediately, even if the user unlocked this
+  // same item earlier in the session.
+  sessionUnlocked.delete(contentId);
   const db = getDb();
   db.prepare('INSERT OR IGNORE INTO locked_channels (content_id, locked_at) VALUES (?, ?)').run(
     contentId,

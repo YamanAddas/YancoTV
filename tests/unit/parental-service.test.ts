@@ -35,6 +35,10 @@ import {
   applyParentalVisibility,
   applyParentalCategoryVisibility,
   filterHiddenItem,
+  requiresPinToPlay,
+  unlockForSession,
+  clearSessionUnlocks,
+  isUnlockedForSession,
 } from '../../src/main/services/parental-service';
 
 describe('Parental Service', () => {
@@ -424,5 +428,102 @@ describe('Parental visibility (MB-404)', () => {
         'Documentary',
       ]);
     });
+  });
+});
+
+describe('Parental playback gating (MB-405)', () => {
+  beforeEach(() => {
+    testDb = createTestDb();
+    resetPinAttempts();
+    clearSessionUnlocks();
+  });
+
+  const enablePin = () => {
+    setPin('1234');
+    updateParentalSetting('pin_enabled', true);
+  };
+
+  it('does not gate anything while no PIN is enabled', () => {
+    lockChannel('c1');
+    expect(requiresPinToPlay('c1')).toBe(false);
+  });
+
+  it('gates a locked item once the PIN is enabled', () => {
+    enablePin();
+    lockChannel('c1');
+    expect(requiresPinToPlay('c1')).toBe(true);
+  });
+
+  it('does not gate an unlocked item', () => {
+    enablePin();
+    lockChannel('c1');
+    expect(requiresPinToPlay('c2')).toBe(false);
+  });
+
+  /**
+   * Fails OPEN for an unknown id, and that is deliberate. `undefined` means
+   * playback of something with no catalogue row — a direct URL, a recording —
+   * which was never lockable. Refusing there would block ordinary playback
+   * rather than protect anything. The caller resolves the id from the stream
+   * URL first, so a LOCKED item does not arrive here as undefined.
+   */
+  it('allows playback of content with no catalogue id', () => {
+    enablePin();
+    lockChannel('c1');
+    expect(requiresPinToPlay(undefined)).toBe(false);
+    expect(requiresPinToPlay('')).toBe(false);
+  });
+
+  it('a session unlock releases that item and only that item', () => {
+    enablePin();
+    lockChannel('c1');
+    lockChannel('c2');
+    unlockForSession('c1');
+    expect(requiresPinToPlay('c1')).toBe(false);
+    expect(requiresPinToPlay('c2')).toBe(true);
+  });
+
+  it('re-locking an item revokes an unlock granted earlier in the session', () => {
+    enablePin();
+    lockChannel('c1');
+    unlockForSession('c1');
+    expect(requiresPinToPlay('c1')).toBe(false);
+    lockChannel('c1');
+    expect(requiresPinToPlay('c1')).toBe(true);
+  });
+
+  it('changing the PIN drops every session unlock', () => {
+    enablePin();
+    lockChannel('c1');
+    unlockForSession('c1');
+    expect(isUnlockedForSession('c1')).toBe(true);
+    setPin('5678');
+    expect(isUnlockedForSession('c1')).toBe(false);
+    expect(requiresPinToPlay('c1')).toBe(true);
+  });
+
+  it('removing the PIN drops every session unlock', () => {
+    enablePin();
+    lockChannel('c1');
+    unlockForSession('c1');
+    removePin();
+    expect(isUnlockedForSession('c1')).toBe(false);
+  });
+
+  it('turning the PIN off stops gating without unlocking anything', () => {
+    enablePin();
+    lockChannel('c1');
+    updateParentalSetting('pin_enabled', false);
+    expect(requiresPinToPlay('c1')).toBe(false);
+    // The lock itself survives, so re-enabling the PIN restores the gate.
+    updateParentalSetting('pin_enabled', true);
+    expect(requiresPinToPlay('c1')).toBe(true);
+  });
+
+  it('unlocking a channel outright removes the gate', () => {
+    enablePin();
+    lockChannel('c1');
+    unlockChannel('c1');
+    expect(requiresPinToPlay('c1')).toBe(false);
   });
 });

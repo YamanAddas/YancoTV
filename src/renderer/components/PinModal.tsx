@@ -10,11 +10,17 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 interface PinModalProps {
   /** What the user is trying to access */
   title?: string;
+  /**
+   * The locked item this prompt is for. A correct PIN unlocks THAT item for the
+   * session (MB-405); omit it for a gate that is not about one piece of content,
+   * such as the Settings PIN, where nothing should be unlocked as a side effect.
+   */
+  contentId?: string;
   /** Called with true if PIN verified, false if cancelled */
   onResult: (verified: boolean) => void;
 }
 
-export function PinModal({ title = 'Enter PIN', onResult }: PinModalProps) {
+export function PinModal({ title = 'Enter PIN', contentId, onResult }: PinModalProps) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
@@ -35,7 +41,7 @@ export function PinModal({ title = 'Enter PIN', onResult }: PinModalProps) {
     setError('');
 
     try {
-      const result = await window.api.parental.verifyPin(pin);
+      const result = await window.api.parental.verifyPin(pin, contentId);
       if (result.verified) {
         onResult(true);
       } else {
