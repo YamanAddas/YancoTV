@@ -50,6 +50,7 @@ import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.http.redactCredentials
 import com.yancotv.shared.playback.Playable
+import com.yancotv.shared.playback.UpNextDecision
 import com.yancotv.shared.playback.toPlayable
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
