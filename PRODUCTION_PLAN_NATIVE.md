@@ -3616,6 +3616,51 @@ Verified: Pixel XL portrait — content starts at **x=72**, title 787 px wide, a
 full width, and no star-zero. Chromecast — content at x=535, which is gutter 43.4 + poster 200 +
 gap 24 in dp, so the side-by-side layout is preserved; 0 fatals.
 
+### MK.37.H — a way out of the detail page, and a splash worth looking at — shipped 2026-09-04
+
+Two things reported from the phone.
+
+**The detail page looked like it had no way out.** `ActionRow` was a plain `Row` of five buttons. A
+non-wrapping row overflows *silently* — the last child, **Back**, was laid out past the right edge of
+a 411 dp screen with nothing to indicate it existed. It is a `FlowRow` now and wraps onto a second
+line; measured on the Pixel XL, Back sits at x=139..229, y=1765, fully on screen.
+
+**The dismissal itself was never broken, and that is worth recording rather than glossing.** Both
+paths were tested on the device before changing anything: the hardware key and the gesture-nav edge
+swipe each returned to the grid, because `HomeScreen` owns that `BackHandler` (`ContentDetailScreen`
+has none of its own — the only one in that file belongs to the season picker). So no handler was
+added. What was broken is that a viewer could not *see* a way out, and concluding there wasn't one is
+the correct reading of that screen.
+
+**The splash logo.** MB-350 had already fixed a real bug here — the theme pointed at the 16:9
+badge+wordmark lockup and the splash API masks its icon to a **circle**, cutting both ends off. Its
+fix shrank the lockup until its diagonal fit the mask: 132x74 dp inside a 160 dp circle. That stopped
+the clipping and left the logo small and adrift in a large empty circle, which is what was asked to be
+redesigned.
+
+A round mask wants a round subject. The system splash now draws `ic_logo_mark` — the 96x96 hexagon
+badge — at 108 dp, so it *fills* the circle instead of being inscribed in it, and there is nothing
+wide left to cut. MB-350's transparent 240 dp square underneath is kept and is still load-bearing:
+without it the drawable's intrinsic size is the bitmap's and the platform scales the icon to fill the
+canvas, pushing the mark back out to the mask's edge.
+
+The wordmark is not lost — it moves to where it can be set as artwork. The platform splash draws one
+masked icon and nothing else; it cannot show a wordmark beside a progress indicator. `BrandSplash`
+draws both, in Compose, on the cinematic backdrop the shell already paints, so the hand-off to Home
+is a change of content rather than a change of scene. The wordmark is `lane * 0.62` clamped, like
+everything else in the shell.
+
+**Gated on real work, never a timer.** The splash covers the first read of the source list and
+disappears when it returns. A splash held open by `delay()` costs the viewer time on every launch;
+this one is a single frame on a warm start and covers a wait that was already happening on a cold
+one. `runCatching` means the gate releases whether the read returns or throws, so it can never strand
+the app on a logo.
+
+Verified: Pixel XL cold launch ~5.1 s reaching Home (the earlier phone measurement was 8.0 s), 0
+fatals, never stuck on the splash. Fire TV 2265 ms and Chromecast 2001 ms — both **faster** than the
+3827/3291 ms measured before, since the splash frame draws ahead of the shell — both reaching the
+shell, 0 fatals.
+
 ### Remaining slices
 
 | Slice | Scope |

@@ -1,27 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  MB-350 — the splash logo, sized to survive the splash screen's circular mask.
+  MK.37.H — the splash icon is the square MARK, not the wide lockup.
 
-  The theme pointed windowSplashScreenAnimatedIcon straight at @drawable/ic_logo,
-  which is the 16:9 badge+wordmark lockup (640x360). The splash API masks that
-  icon to the system icon shape — a circle — so a wide image loses both ends and
-  the user sees the logo clipped into a horizontal oval.
+  MB-350 fixed a real bug here (the theme pointed at @drawable/ic_logo, the
+  16:9 badge+wordmark lockup, and the splash API masks its icon to a CIRCLE, so
+  both ends of a wide image were cut off). Its fix was to shrink the lockup
+  until its diagonal fit the circle — 132x74dp inside a 160dp mask. That stopped
+  the clipping and left the logo small and adrift in a large empty circle, which
+  is what the owner asked to be redesigned.
 
-  The geometry: the icon canvas is 240dp and only a 160dp-diameter circle is
-  visible. A 16:9 rectangle fits inside a circle of diameter D when its diagonal
-  equals D, so w = D / sqrt(1 + (9/16)^2) = 160 / 1.147 = 139dp. 132x74dp is that
-  bound with margin to spare (diagonal 151dp against the 160dp circle), and it
-  keeps the exact 16:9 ratio so the artwork is never distorted.
+  A round mask wants a round subject. `ic_logo_mark` is the 96x96 hexagon badge:
+  square artwork, so it fills the visible circle instead of being inscribed in
+  it, and nothing is cut off because there is nothing wide to cut.
 
-  The transparent 240dp square underneath is load-bearing, not padding. Without
-  it this drawable's intrinsic size would be the bitmap's, and the platform
-  scales the icon drawable to fill the canvas — which would blow the logo back up
-  to the full width and re-crop it. The square pins the intrinsic aspect to 1:1
-  so scale-to-canvas preserves the inset instead of eating it.
+  The wordmark is not lost — it moves to where it can actually be set as type.
+  The system splash cannot show a wordmark and a progress indicator; it draws
+  one masked icon and nothing else. `BrandSplash` draws both, in Compose, the
+  moment the window is ours.
 
-  Kept as the full lockup rather than swapping to the square ic_logo_mark: the
-  request was for all of the logo with no cuts, and the mark alone would drop the
-  wordmark. The cost is that the logo renders smaller than it used to.
+  The transparent 240dp square underneath is still load-bearing (MB-350's own
+  finding): without it the drawable's intrinsic size is the bitmap's, and the
+  platform scales the icon to fill the canvas — which would push the mark back
+  out to the mask's edge. The square pins the intrinsic aspect to 1:1 so the
+  inset survives. 108dp of a 160dp visible circle leaves the badge room to read
+  as a badge rather than as a disc.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
@@ -32,9 +34,9 @@
     </item>
     <item android:gravity="center">
         <bitmap
-            android:src="@drawable/ic_logo"
+            android:src="@drawable/ic_logo_mark"
             android:gravity="center"
-            android:width="132dp"
-            android:height="74dp" />
+            android:width="108dp"
+            android:height="108dp" />
     </item>
 </layer-list>

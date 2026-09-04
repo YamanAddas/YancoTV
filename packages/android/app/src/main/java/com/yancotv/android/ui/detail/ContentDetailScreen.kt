@@ -13,6 +13,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -869,6 +870,7 @@ private fun CreditRow(label: String, value: String) {
 }
 
 @Composable
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 private fun ActionRow(
     primaryLabel: String,
     showPlayFromStart: Boolean,
@@ -896,10 +898,22 @@ private fun ActionRow(
     // fill + scale + halo on focus, not from a height difference vs its
     // companions.
     val buttonSize = ButtonSize.Compact
-    Row(
+    // MK.37.H — a FlowRow, not a Row.
+    //
+    // Five buttons in a non-wrapping Row need more width than a phone in
+    // portrait has, and the overflow is silent: the last child — **Back** —
+    // was simply laid out past the right edge. Nothing announced it and
+    // nothing clipped visibly, so the page looked like it had no way out.
+    // The gesture and the hardware key both still dismissed it (HomeScreen
+    // owns that handler), but a viewer who cannot see the control has no
+    // reason to believe the page is escapable, and reported exactly that.
+    //
+    // Wrapping is the fix rather than a scroll: these are five short labels,
+    // and on a tall lane they take two lines and stay entirely on screen.
+    FlowRow(
         modifier = Modifier.padding(top = Space.sm),
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
         // Primary "Resume / Play / Continue" CTA. The placedFocus(playAnchor)
         // is what the open-time focus ladder targets; the onFocusChanged

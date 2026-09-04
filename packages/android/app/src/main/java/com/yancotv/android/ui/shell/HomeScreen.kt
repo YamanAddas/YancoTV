@@ -371,12 +371,27 @@ fun HomeScreen(
         }
     }
 
+    // MK.37.H — the branded splash covers the first read of the source list and
+    // nothing more. Gated on real work rather than a timer: a splash held open
+    // by `delay()` costs the viewer time on every launch. `runCatching` means
+    // the gate releases whether the read returns or throws — it can never stick
+    // the app on a logo.
+    var shellReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { runCatching { sources.getAll() } }
+        shellReady = true
+    }
+
     // MK.37.A — the shell measures its window once, here, and publishes the
     // result. Nothing reads it yet: this slice adds the layer and the rotation
     // unlock and changes no rendering, so the television is byte-for-byte what
     // it was. Screens adopt `LocalShellMetrics` one at a time from MK.37.B,
     // each with its own TV pass.
     CompositionLocalProvider(LocalShellMetrics provides rememberShellMetrics()) {
+    if (!shellReady) {
+        BrandSplash()
+        return@CompositionLocalProvider
+    }
     val shellMetrics = LocalShellMetrics.current
     val usesSidebar = shellMetrics.usesSidebar
     var showOverflow by rememberSaveable { mutableStateOf(false) }
