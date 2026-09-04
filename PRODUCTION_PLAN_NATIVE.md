@@ -3895,14 +3895,56 @@ and I read them as "the dock did not appear" — the device had returned to the 
 pressing CENTER at the launcher. A negative device result is worth nothing until the dump's `package`
 attribute says the app is on screen. The owner's photograph is what settled it.
 
-Still to check on a device (not blocking slice 1, but not done):
-  - the zap bar and the OSD, now riding with the dock rather than with Media3's controller
-  - D-pad focus order across the dock on a channel, and that it cannot escape the dock
-  - zapping VOD → live → VOD swaps the surface cleanly
+D-pad focus was then checked on the same channel: the dock opens on play/pause, RIGHT walks
+transport → CC → … → ⋯, and both edges hold — LEFT stops at -10 and RIGHT stops at ⋯ rather than
+escaping into the video surface. Live → VOD swaps cleanly: a film renders the same dock with NEXT
+and the seek ribbon, a channel with neither and the programme row instead.
 
-**Slice 2 — the More button.** Not started. The owner's refinement: iOS hides controls because the
-bar cannot fit them, and the fix is a More button that surfaces the overflow instead of dropping it.
-The `⋯` on screen today is the existing MENU control, not this. iOS follows whatever lands here.
+**The claim about the zap bar was wrong**, and it was wrong here before it was wrong in the code.
+The section said the zap bar and programme row "ride with the dock now". They did not. Their clock
+had been Media3's `ControllerVisibilityListener`, and setting `useController = false` on live stopped
+that listener firing, so the zap bar's visibility was decided at channel-change time — when the dock
+is always closed — and never reconsidered. It could not appear at all. `MK.38.3` deletes both
+overlays rather than reviving them: every fact they carried (channel name, LIVE badge, now, next,
+progress) is already in the dock, in one place instead of two. See that commit for the
+`ArrayStoreException` the removal uncovered.
+
+### MK.38.2 — the dock measures itself
+
+The owner's refinement, brought over from iOS: a **More** button that surfaces what does not fit,
+rather than hiding controls. Android's version of that button already existed — `⋯` opens the
+options root, and the root already holds Subtitles, Audio, Speed, Aspect and Favourites — so the
+work was to pin it and drop around it, not to add a second `⋯`.
+
+What was actually broken is that nothing had ever measured the row. Compose's `Row` does not wrap or
+scroll: past the edge it measures children at **zero width**, so a control is not clipped, it is
+absent. And `⋯` is last in the order, so the first thing a narrow screen deleted was the only
+control that could reach what it had deleted.
+
+Not hypothetical. Every size in the brief is a fraction of a 1920 px television, so on a phone they
+all sit on their floors:
+
+| Screen (landscape) | Locale | Row needs | Row has | Result |
+|---|---|---|---|---|
+| 731 dp | English | ~579 dp | 635 dp | fits |
+| 731 dp | Spanish | ~610 dp | 635 dp | fits, barely |
+| 640 dp | English | ~571 dp | 544 dp | **27 dp cut** |
+| 640 dp | Spanish | ~601 dp | 544 dp | **57 dp cut** |
+
+Spanish is not an edge case, it is `VELOCIDAD` where English has `SPEED`.
+
+`fitDockControls` is a pure function over widths, drop order least-useful-first
+(favourite → aspect → speed → audio → subtitles), with transport and `⋯` pinned at every width.
+14 tests. The width formula moved to `PlayerChromeMetrics` so the calculation and `DockSecondary`
+cannot disagree — and the device confirmed the formula exactly: CC 52 px, AUDIO 81 px, FIT 61 px,
+gap 15 px, which are the numbers the fit calculation uses. At 1920 there is ~500 dp of headroom, so
+nothing drops on a television and the TV render is unchanged.
+
+**Not yet seen on a narrow screen.** The overflow branch is proven by the tests and by the width
+formula matching the renderer, not by a phone: the only device carrying the owner's catalogue is the
+television, and the phone's debug seed points at streams that 404. `adb shell wm size 1280x720`
+would produce the 640 dp case on the TV in about ten seconds — worth doing, but not on the owner's
+television unasked.
 
 ### Remaining slices
 
