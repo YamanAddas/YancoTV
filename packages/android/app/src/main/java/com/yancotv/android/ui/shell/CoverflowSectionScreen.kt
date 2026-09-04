@@ -1590,6 +1590,17 @@ private val OrbHeight = 200.dp
 private val OrbSpacing = 28.dp
 
 /**
+ * How far a live logo must sit inside the hexagon to clear its diagonal cuts.
+ *
+ * `HexCapsule` cuts 28% of the edge at top and bottom (see `YancoShapes`), and a
+ * provider logo is a square image with the mark running to nearly its full width
+ * — measured, V Sport ships 96x96 with the wordmark at 98%. 0.72 of the cut is
+ * where a centred square clears the diagonal at every height it occupies. The
+ * hexagon itself keeps its size; only its contents shrink.
+ */
+internal fun hexLogoInset(art: Dp): Dp = (art * 0.28f).coerceIn(10.dp, 36.dp) * 0.72f
+
+/**
  * The portrait browse grid.
  *
  * Twelve titles where the wheel showed three, and no gap by construction — the
@@ -1823,7 +1834,11 @@ private fun ContentOrb(
             Modifier
                 .size(art)
                 .shadow(
-                    elevation = if (focused) 28.dp else 6.dp,
+                    // 6 dp was the resting bed and it disappears against
+                    // BackgroundDeep, which is what left an unfocused grid
+                    // looking like cut-outs on flat black rather than lit
+                    // objects sitting on a surface.
+                    elevation = if (focused) 28.dp else 12.dp,
                     shape = YancoShapes.HexCapsule,
                     ambientColor = LocalYancoPalette.current.Accent,
                     spotColor = LocalYancoPalette.current.Accent,
@@ -1836,8 +1851,28 @@ private fun ContentOrb(
                         ),
                     ),
                 ).border(
+                    // MK.37.C.4 — a gradient edge on every orb, not a flat one
+                    // on the focused orb alone.
+                    //
+                    // The lit treatment here was gated on `focused`, and **touch
+                    // never moves Compose focus** — so on a phone every orb
+                    // renders in the unfocused state and the grid reads as a
+                    // sheet of flat cut-outs. A gradient stroke reads as a bevel
+                    // catching light from the upper left, which is the same
+                    // story `HexSurface` tells on the rectangular cards; a flat
+                    // stroke reads as a sticker.
                     width = if (focused) 2.dp else 1.dp,
-                    color = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.PanelBorder,
+                    brush =
+                    if (focused) {
+                        androidx.compose.ui.graphics.SolidColor(LocalYancoPalette.current.FocusRing)
+                    } else {
+                        Brush.linearGradient(
+                            listOf(
+                                LocalYancoPalette.current.PanelBorder.copy(alpha = 0.95f),
+                                LocalYancoPalette.current.PanelBorder.copy(alpha = 0.35f),
+                            ),
+                        )
+                    },
                     shape = YancoShapes.HexCapsule,
                 ).then(placedAnchor?.let { Modifier.placedFocus(it) } ?: Modifier)
                 .then(entryFocus?.let { Modifier.focusRequester(it) } ?: Modifier)
@@ -1905,7 +1940,16 @@ private fun ContentOrb(
                     modifier =
                     Modifier
                         .fillMaxSize()
-                        .padding(if (type == ContentType.LIVE) Space.lg else 0.dp),
+                        // MK.37.C.4 — the inset scales with the tile.
+                        //
+                        // `HexCapsule` narrows by its side cut at the top and
+                        // bottom edges, so a logo drawn to the full width loses
+                        // its outer letters to the diagonal — TNT keeping two of
+                        // three rings, "ULTRAHD" ending at "ULTRAH". A fixed
+                        // 16 dp was right for the 140 dp television orb and too
+                        // small for every other size, because the cut is a
+                        // fraction of the tile and 16 dp is not.
+                        .padding(if (type == ContentType.LIVE) hexLogoInset(art) else 0.dp),
                 )
             } else {
                 Text(

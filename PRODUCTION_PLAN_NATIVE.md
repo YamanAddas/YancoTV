@@ -3425,6 +3425,42 @@ Fire TV re-checked: `Home [40,160][160,264]`, `Live TV [40,268][160,372]`, 0 fat
 more air between rows — and this slice changed geometry and text, not the material. That is worth a
 look of its own rather than being folded in here.
 
+### MK.37.C.4 — the orb's surface, and two scaling bugs behind it — shipped 2026-09-04
+
+The owner compared the grid to the reference build: "glassy ومرتب اكتر" against "زحمة ومشرشح".
+MK.37.C.3 fixed the geometry and the text; this is the material. Two defects, both the same shape —
+a constant tuned against the television orb, applied to every size once MK.37 started deriving tile
+sizes from the lane.
+
+**The lit treatment was gated on focus, and touch never moves Compose focus.** The orb's 28 dp glow
+and its focus ring only ever appear on a focused node. On a television one orb always has focus, so
+the rail reads as lit objects; **on a phone nothing is ever focused**, so every orb in the grid drew
+in the resting state — a 6 dp shadow that disappears against `BackgroundDeep`, and a flat 1 dp
+stroke. A sheet of flat cut-outs, which is exactly what "مشرشح" describes. Every orb now gets a
+gradient edge — a stroke that reads as a bevel catching light from the upper left, the same story
+`HexSurface` tells on the rectangular cards — and the resting bed went 6 dp to 12 dp so an unfocused
+orb sits on a surface rather than on flat black.
+
+**Live logos were clipped by the hexagon's own diagonal.** `HexCapsule` cuts 28% of the edge at top
+and bottom, and a provider logo is a square image with the mark running to nearly its full width
+(measured: V Sport ships 96x96 with the wordmark at 98%). The inset was a fixed **16 dp** — correct
+for the 140 dp television orb and too small for everything else, because the cut is a *fraction* of
+the tile and 16 dp is not. On the phone's 115 dp tile the logo needs **23.2 dp**, so the outer
+letters were running into the diagonal: TNT keeping two of three rings, "ULTRAHD" ending at
+"ULTRAH". `hexLogoInset` derives it as `clamp(art * 0.28, 10, 36) * 0.72`, which is where a centred
+square clears the diagonal at every height it occupies. The reference documents this exact complaint
+against its own build — "الايقونات شكلها غلط" — and fixes it the same way.
+
+`HexLogoInsetTest` pins that the inset scales, that a phone tile needs more than the old constant,
+and that it clamps at both ends.
+
+Verified: Pixel XL renders without a crash at 23.2 dp inset; Fire TV `Home [40,160][160,264]` and
+Chromecast both unchanged, 0 fatals.
+
+**Not ported:** the reference also beds each card in a faint glow taken from its genre hue, so a rail
+of off-centre cards reads as lit objects in their own colours. That needs the genre-hue mapping
+brought across as well and is a bigger piece than a surface tweak.
+
 ### MK.37.D — Home sized from the lane it has — shipped 2026-09-04
 
 Home's rails, hero and gutter were the last surfaces still drawing at Fire TV numbers. A rail tile
