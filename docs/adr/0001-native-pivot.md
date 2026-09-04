@@ -50,6 +50,24 @@ Pattern recognition: every TiviMate-shaped feature we need next — mini-preview
 
 ## References
 
+## Amendment — 2026-09-04: the ports are not mirrors
+
+"The two are mirrored ports with mirrored tests" above described the intent at the time of the
+pivot. **The owner has since decided otherwise:** `packages/core/` and `packages/shared/` are
+independent, each carries what its own apps need, and a capability landing in one is not a debt
+owed by the other.
+
+This is not a loosening of standards; it removes work that bought nothing. The original text is
+left as written because an ADR records what was decided when, and porting for symmetry has since
+produced concrete waste — see `bugs.md` MB-200, where an M3U streaming rewrite was reasonable on a
+Fire TV's 384 MB heap and pointless on Electron's gigabytes, and MK.36.3b, a follow-up slice filed
+purely to close a gap nobody had asked to close.
+
+What still crosses both ports is anything the *user* can see the difference in — a title that
+cleans one way on the TV and another on the desktop is a bug, not a divergence. The operative rule
+now lives in AGENTS.md (the two-ports note and rule 8).
+
+
 - Commit `09150e9` — M4R.Player: native `PlayerActivity` + `PlayerLauncher` (the fix that made the decision obvious)
 - [PRODUCTION_PLAN_NATIVE.md](../../PRODUCTION_PLAN_NATIVE.md) — active native roadmap (MK.0 → MK.12 → MK.iOS.*)
 - [PRODUCTION_PLAN_ANDROID.md](../../PRODUCTION_PLAN_ANDROID.md) — frozen RN roadmap, reference only

@@ -2868,8 +2868,9 @@ commits accumulated there, and a large minority of them are **not iOS code**: th
 `packages/shared/` (the KMP core both platforms run on) and `packages/core/` (its TypeScript
 twin). Four schema migrations, a name-based EPG index, playlist-divider detection, browse-row
 facts, Unicode letterform folding, and a query-plan fix worth 3m22s -> 0.09s all landed there
-and none of them exist here. That is AGENTS.md rule 8 drifting in real time, and the cost of
-untangling it grows with every session on either side.
+and none of them exist here. These are improvements this repo's apps want and do not have — the
+reason to merge is the value of the work, not a parity obligation — and the cost of untangling two
+diverging histories of the *same* files grows with every session on either side.
 
 **Scope of 36.1 (this slice): take the shared core, wire nothing.** No `app/` changes. The
 merge is deliberately inert at the UI layer so that a regression, if there is one, is
@@ -2880,9 +2881,10 @@ attributable to the core and not to new wiring landing at the same time.
 Taken wholesale from `ios/master` (`24b36acf`):
 `packages/shared/src/{commonMain,commonTest,androidMain,androidUnitTest}`, plus the
 TypeScript mirrors `packages/core/src/content/title-cleaner.ts`, `packages/core/src/xtream/`
-and their tests. The TS half is not optional: `title-cleaner.ts` is the desktop twin of
-`TitleCleaner.kt` and taking one without the other splits the two ports on what a clean title
-is, which is the exact duplication rule 8 forbids.
+and their tests. The TS half is taken here for a specific reason, not for symmetry:
+`title-cleaner.ts` and `TitleCleaner.kt` are two implementations of one *user-visible contract* —
+what a clean title is — and a title that reads one way on the TV and another on the desktop is a
+bug the user sees. Where a port only carries capability its own apps use, it is free to differ.
 
 **Why the app compiles untouched.** Every public API change is additive — new functions, new
 data-class fields carrying defaults. `ContentRepository` gains `groupTallies`,
@@ -2994,11 +2996,17 @@ write path is the only thing that changed. Auto-sync-on-start sources clear on t
 migration was considered and rejected: the rule needs "three or more of the *same* character at
 *both* ends", which in SQL is a dozen OR'd GLOBs over 274k rows for a cosmetic gain.
 
-**Known gap — the TypeScript mirror.** `packages/core/` has no `isPlaylistDivider`, so desktop still
-shows banner rows. This is a real AGENTS.md rule 8 divergence and it is recorded rather than hidden:
-the desktop toolchain could not be brought up in this session (`pnpm install` fails resolving
-`mpegts.js@1.8.0`), so porting it blind and untested would have been worse than saying so. Follow-up
-is MK.36.3b.
+**A difference, not a gap (owner's call, 2026-09-04).** `packages/core/` has no
+`isPlaylistDivider`, so desktop still shows banner rows. This was first written up here as a rule 8
+divergence with a follow-up slice, **MK.36.3b — that framing was wrong and the slice is dropped.**
+The two ports are independent and are not required to match; each carries what its own apps need.
+Banner filtering is something Android wanted and desktop has not asked for. If desktop does want it
+later it is a normal piece of work, not a debt this milestone left behind. (AGENTS.md's two-ports
+note and rule 8 were rewritten to say so, so the next session does not re-file it.)
+
+Worth keeping either way: the desktop toolchain could not be brought up in this session
+(`pnpm install` fails resolving `mpegts.js@1.8.0`), so anything written for `packages/core/` here
+would have shipped untested.
 
 Verified: 826 shared tests, 0 failures (2 new — one asserts the two banners are dropped **and**
 that `### SPORTS`, `Ping-Pong -- Live` and `BBC News` all survive; the first draft of that assertion

@@ -12,7 +12,7 @@ Custom IPTV app. Three sibling apps on a shared business core:
 
 **Frozen:** `packages/mobile/` (React Native). No new work except P0.
 
-Shared logic runs in two parallel ports: `packages/core/` (TypeScript, for desktop) and `packages/shared/` (Kotlin Multiplatform, for Android/iOS). Mirror tests on both sides; neither is the source.
+Shared logic runs in two independent ports: `packages/core/` (TypeScript, for desktop) and `packages/shared/` (Kotlin Multiplatform, for Android/iOS). Neither is the source, and **they are not required to match.** Each port carries what its own apps need; a capability landing in one is not a debt owed by the other. Port something across when the other platform actually wants it — not to close a gap for its own sake, and never as a blind translation of code you cannot test on that side.
 
 ## Active plan
 
@@ -39,7 +39,7 @@ Fire TV target for native: `adb connect 192.168.68.56:5555` then `installDebug`.
 5. **SQLDelight is the only DB surface on native.** Timestamps are milliseconds **except** `watch_history.position_seconds` / `duration_seconds` (media offsets, not wall-clock) **and `epg_programmes.start_time` / `end_time` (XMLTV epoch SECONDS — matches xmltv.dtd; the guide and catch-up compare against `clock()/1000`, so do NOT "correct" these to ms — see MB-390).**
 6. **Compose TV uses `androidx.tv.material`.** Don't reuse Material3 clickables as TV focus targets.
 7. **Ktor + Kotlinx Serialization on native.** No Retrofit/Moshi/Gson — they don't compile for iOS.
-8. **Don't duplicate shared logic.** If it's tempting to copy code between `src/main/services/` and `packages/android/` or `packages/shared/`, extract to the right core package first and port the test with it.
+8. **Don't duplicate logic inside a port.** If it's tempting to copy code between `src/main/services/` and the rest of desktop, or between `packages/android/` and `packages/shared/`, extract to that port's core package first and take the test with it. This is about one platform repeating itself — it says nothing about the *other* port, which is free to differ (see the two-ports note above).
 9. **Build `@yancotv/core` before `pnpm dev`/`build`.** It's ESM; Node 24 rejects directory imports. Root `package.json` runs `build:core` automatically — don't break that chain.
 10. **No feature work outside the active plan.** If it's not in the relevant `MK.*` or Sprint task, add it to the plan first.
 
