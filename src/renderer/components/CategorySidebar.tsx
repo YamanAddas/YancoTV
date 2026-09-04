@@ -26,6 +26,7 @@ import { useCategoryGroups, type EnhancedSection } from '../hooks/use-category-g
 import { GroupContextMenu, type ContextMenuAction } from './GroupContextMenu';
 import type { ContentType } from '../../shared/types';
 import { prettifyGroupName, type SmartChild } from '@yancotv/core';
+import { useT } from '../i18n';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -112,6 +113,7 @@ function SortableChild({
   count?: number;
   onSelect: () => void;
 }) {
+  const t = useT();
   const {
     attributes,
     listeners,
@@ -136,7 +138,7 @@ function SortableChild({
         {...listeners}
         tabIndex={-1}
         className="flex h-7 w-4 flex-shrink-0 cursor-grab items-center justify-center text-surface-600 opacity-0 transition-opacity group-hover/child:opacity-100 active:cursor-grabbing"
-        title="Drag to reorder"
+        title={t('action.dragToReorder')}
       >
         <svg className="h-2.5 w-2.5" viewBox="0 0 10 16" fill="currentColor">
           <circle cx="3" cy="4" r="1" />
@@ -188,6 +190,7 @@ function SortableSection({
   onSelectChild: (groupName: string) => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
+  const t = useT();
   const {
     attributes,
     listeners,
@@ -237,7 +240,7 @@ function SortableSection({
           {...listeners}
           tabIndex={-1}
           className="flex h-8 w-5 flex-shrink-0 cursor-grab items-center justify-center text-surface-600 opacity-0 transition-opacity group-hover/section:opacity-100 active:cursor-grabbing"
-          title="Drag to reorder"
+          title={t('action.dragToReorder')}
         >
           <svg className="h-3 w-3" viewBox="0 0 10 16" fill="currentColor">
             <circle cx="3" cy="2" r="1.2" />
@@ -331,6 +334,7 @@ export function CategorySidebar({
   totalCount,
   defaultCollapsed,
 }: CategorySidebarProps) {
+  const t = useT();
   const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false);
   const [searchQuery, setSearchQuery] = useState('');
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -549,7 +553,7 @@ export function CategorySidebar({
               </svg>
               <input
                 type="text"
-                placeholder="Filter groups..."
+                placeholder={t('category.filterPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full rounded-md border border-surface-700/50 bg-surface-800/50 py-1.5 pl-8 pr-2.5 text-[13px] text-surface-200 placeholder-surface-600 outline-none transition-colors focus:border-accent/40 focus:ring-1 focus:ring-accent/20"

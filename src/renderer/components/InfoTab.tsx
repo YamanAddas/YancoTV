@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import type { ContentMetadata } from '../../shared/types';
+import { useT } from '../i18n';
 
 interface InfoTabProps {
   metadata: ContentMetadata;
 }
 
 export function InfoTab({ metadata }: InfoTabProps) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
 
   const description = metadata.plot || metadata.description;
@@ -50,7 +52,7 @@ export function InfoTab({ metadata }: InfoTabProps) {
           )}
 
           {director && (
-            <InfoRow label="Director" value={director} />
+            <InfoRow label={t('detail.director')} value={director} />
           )}
 
           {genres.length > 0 && (

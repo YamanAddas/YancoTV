@@ -63,6 +63,28 @@ const MIGRATED = new Set(
   ].map((p) => p.split('/').join(path.sep)),
 );
 
+/**
+ * Strings that are deliberately NOT translated, with the reason.
+ *
+ * Kept explicit so the count can reach zero honestly. A scanner that stops at
+ * "2 remaining" forever teaches people to ignore it.
+ */
+const EXCLUDED = {
+  'src/renderer/components/ErrorBoundary.tsx': {
+    'Something broke':
+      'Error boundaries must be class components, which cannot use hooks — and ' +
+      'more importantly this screen renders when the app has already crashed. ' +
+      'Making the crash screen depend on the i18n context risks it failing to ' +
+      'render at exactly the moment it is needed.',
+  },
+  'src/renderer/i18n/index.tsx': {
+    English:
+      'The locale registry uses its own endonym here. Language names in the ' +
+      'shown in their own language — English / العربية — so translating this ' +
+      'would be a bug, not a fix.',
+  },
+};
+
 /** JSX text between tags, e.g. `>Save changes<`. */
 const JSX_TEXT = /> *([A-Z][A-Za-z0-9 ,.'\-?!()/&]{3,80}?) *</g;
 /** String-valued props that reach the user. */
@@ -107,6 +129,11 @@ function candidates(file) {
   OBJECT_LABEL.lastIndex = 0;
   let lm;
   while ((lm = OBJECT_LABEL.exec(body)) !== null) found.add(lm[1].trim());
+
+  const rel = path.relative(ROOT, file).split(path.sep).join('/');
+  const skip = EXCLUDED[rel] || {};
+  for (const text of Object.keys(skip)) found.delete(text);
+
   return [...found];
 }
 

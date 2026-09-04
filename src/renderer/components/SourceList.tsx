@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useT } from '../i18n';
 
 interface Source {
   id: string;
@@ -108,6 +109,7 @@ function SourceItem({
   onDragEnter: (index: number) => void;
   onDragEnd: () => void;
 }) {
+  const t = useT();
   const [syncing, setSyncing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -235,7 +237,7 @@ function SourceItem({
       {editing ? (
         <form onSubmit={handleSaveEdit} className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-surface-300">Edit Source</span>
+            <span className="text-sm font-medium text-surface-300">{t('source.edit')}</span>
             <button
               type="button"
               onClick={() => setEditing(false)}
@@ -264,14 +266,14 @@ function SourceItem({
             type="text"
             value={editEpgUrl}
             onChange={(e) => setEditEpgUrl(e.target.value)}
-            placeholder="EPG URL (leave empty to keep current)"
+            placeholder={t('source.epgUrlKeep')}
             className="w-full rounded-md border border-surface-700/50 bg-surface-800/60 px-2.5 py-1.5 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none"
           />
           <input
             type="text"
             value={editUserAgent}
             onChange={(e) => setEditUserAgent(e.target.value)}
-            placeholder="Custom User-Agent (optional — overrides global)"
+            placeholder={t('source.customUserAgent')}
             className="w-full rounded-md border border-surface-700/50 bg-surface-800/60 px-2.5 py-1.5 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none"
           />
           {editError && (

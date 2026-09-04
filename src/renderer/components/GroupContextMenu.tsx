@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useT } from '../i18n';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,6 +40,7 @@ export function GroupContextMenu({
   onAction,
   onClose,
 }: GroupContextMenuProps) {
+  const t = useT();
   const menuRef = useRef<HTMLDivElement>(null);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(groupLabel);
@@ -104,12 +106,12 @@ export function GroupContextMenu({
       },
     },
     {
-      label: 'Rename',
+      label: t('action.rename'),
       icon: renameIcon,
       action: () => setRenaming(true),
     },
     {
-      label: 'Hide',
+      label: t('action.hide'),
       icon: hideIcon,
       action: () => {
         onAction({ type: 'hide', groupKey });
@@ -118,7 +120,7 @@ export function GroupContextMenu({
     },
     { divider: true as const },
     {
-      label: 'Move to Top',
+      label: t('action.moveToTop'),
       icon: moveTopIcon,
       action: () => {
         onAction({ type: 'moveToTop', groupKey });

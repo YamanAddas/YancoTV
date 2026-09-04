@@ -3,6 +3,7 @@ import { usePlayerStore } from '../../stores/player-store';
 import { TheaterControls } from './TheaterControls';
 import { SettingsPanel } from './SettingsPanel';
 import { AspectMenu } from './AspectMenu';
+import { useT } from '../../i18n';
 
 const CONTROLS_HIDE_DELAY = 3000;
 
@@ -11,6 +12,7 @@ const CONTROLS_HIDE_DELAY = 3000;
  * This is the theater mode view: sidebar hidden, full-window video + overlay controls.
  */
 export function PlayerContainer() {
+  const t = useT();
   const containerRef = useRef<HTMLDivElement>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const status = usePlayerStore((s) => s.status);
@@ -156,10 +158,10 @@ export function PlayerContainer() {
                 onClick={() => usePlayerStore.getState().stop()}
                 className="rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
               >
-                Back to menu
+                {t('player.backToMenu')}
               </button>
             </div>
-            <span className="text-xs text-surface-500">Or press Escape</span>
+            <span className="text-xs text-surface-500">{t('player.orPressEscape')}</span>
           </div>
         </div>
       )}

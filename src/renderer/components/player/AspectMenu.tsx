@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { usePlayerStore } from '../../stores/player-store';
+import { useT } from '../../i18n';
+import type { StringKey } from '../../i18n/locales/en';
 
 /**
  * Compact aspect-ratio picker — appears above the aspect button in the
@@ -10,17 +12,21 @@ interface AspectMenuProps {
   onClose: () => void;
 }
 
-const ASPECT_OPTIONS: { value: string; label: string; hint?: string }[] = [
-  { value: 'auto', label: 'Auto', hint: 'Original' },
-  { value: '16:9', label: '16:9', hint: 'Widescreen' },
-  { value: '4:3', label: '4:3', hint: 'Classic TV' },
-  { value: '21:9', label: '21:9', hint: 'Ultrawide' },
-  { value: '2.35:1', label: '2.35:1', hint: 'Cinemascope' },
-  { value: '1:1', label: '1:1', hint: 'Square' },
-  { value: 'fill', label: 'Fill', hint: 'Stretch' },
+// Keys, not resolved labels: a module-level constant is evaluated once at
+// import and would freeze the language active at load. `label` stays a literal
+// for the ratios themselves — "16:9" is not language-dependent.
+const ASPECT_OPTIONS: { value: string; label?: string; labelKey?: StringKey; hintKey: StringKey }[] = [
+  { value: 'auto', labelKey: 'value.auto', hintKey: 'aspect.original' },
+  { value: '16:9', label: '16:9', hintKey: 'aspect.widescreen' },
+  { value: '4:3', label: '4:3', hintKey: 'aspect.classicTv' },
+  { value: '21:9', label: '21:9', hintKey: 'aspect.ultrawide' },
+  { value: '2.35:1', label: '2.35:1', hintKey: 'aspect.cinemascope' },
+  { value: '1:1', label: '1:1', hintKey: 'aspect.square' },
+  { value: 'fill', labelKey: 'value.fill', hintKey: 'aspect.stretch' },
 ];
 
 export function AspectMenu({ onClose }: AspectMenuProps) {
+  const t = useT();
   const aspectRatio = usePlayerStore((s) => s.aspectRatio);
   const setAspectRatio = usePlayerStore((s) => s.setAspectRatio);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -61,7 +67,7 @@ export function AspectMenu({ onClose }: AspectMenuProps) {
     >
       <div className="border-b border-white/10 px-4 py-2.5">
         <p className="text-xs font-medium uppercase tracking-wider text-surface-400">
-          Aspect Ratio
+          {t('player.aspectRatio')}
         </p>
       </div>
       <ul className="max-h-72 overflow-y-auto py-1">
@@ -92,10 +98,10 @@ export function AspectMenu({ onClose }: AspectMenuProps) {
                   ) : (
                     <span className="inline-block h-4 w-4" />
                   )}
-                  <span className="font-medium">{opt.label}</span>
+                  <span className="font-medium">{opt.labelKey ? t(opt.labelKey) : opt.label}</span>
                 </span>
-                {opt.hint && (
-                  <span className="text-xs text-surface-500">{opt.hint}</span>
+                {opt.hintKey && (
+                  <span className="text-xs text-surface-500">{t(opt.hintKey)}</span>
                 )}
               </button>
             </li>

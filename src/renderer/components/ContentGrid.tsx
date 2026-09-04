@@ -23,6 +23,7 @@ import { PosterCard } from './PosterCard';
 import { ChannelHexRow } from './ChannelHexRow';
 import { prettifyGroupName } from '@yancotv/core';
 import type { NowNextMap } from '../../shared/types/epg';
+import { useT } from '../i18n';
 
 /**
  * Maximum items the reorder path will render non-virtualized. Over this size
@@ -362,6 +363,7 @@ function SortableGridItem({
 }
 
 function SortableChannelRow(props: CardProps) {
+  const t = useT();
   const { item } = props;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -381,7 +383,7 @@ function SortableChannelRow(props: CardProps) {
         {...listeners}
         tabIndex={-1}
         className="flex w-4 flex-shrink-0 cursor-grab items-center justify-center text-surface-600 opacity-0 transition-opacity group-hover/row:opacity-100 active:cursor-grabbing"
-        title="Drag to reorder"
+        title={t('action.dragToReorder')}
       >
         <svg className="h-3 w-3" viewBox="0 0 10 16" fill="currentColor">
           <circle cx="3" cy="2" r="1.2" />
@@ -687,6 +689,7 @@ function ContextMenu({
   onHideChannel?: () => void;
   onRecord?: () => void;
 }) {
+  const t = useT();
   return (
     <div
       className="glass-strong fixed z-50 min-w-[160px] overflow-hidden rounded-xl py-1 shadow-glass"
@@ -714,7 +717,7 @@ function ContextMenu({
         />
       )}
       {onHideChannel && (
-        <ContextMenuItem onClick={onHideChannel} icon={<EyeOffIcon />} label="Hide Channel" danger />
+        <ContextMenuItem onClick={onHideChannel} icon={<EyeOffIcon />} label={t('action.hideChannel')} danger />
       )}
     </div>
   );

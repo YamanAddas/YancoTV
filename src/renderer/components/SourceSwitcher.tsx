@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useT } from '../i18n';
 
 interface Source {
   id: string;
@@ -12,6 +13,7 @@ interface SourceSwitcherProps {
 }
 
 export function SourceSwitcher({ selected, onSelect }: SourceSwitcherProps) {
+  const t = useT();
   const [sources, setSources] = useState<Source[]>([]);
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function SourceSwitcher({ selected, onSelect }: SourceSwitcherProps) {
         onChange={(e) => onSelect(e.target.value || null)}
         className="rounded-md border border-accent/5 bg-surface-800 px-2 py-1 text-sm text-surface-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
       >
-        <option value="">All Sources</option>
+        <option value="">{t('source.allSources')}</option>
         {sources.map((s) => (
           <option key={s.id} value={s.id}>
             {s.name}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import type { ContentItem, ContentMetadata, Episode } from '../../shared/types';
+import { useT } from '../i18n';
 
 interface DetailHeroProps {
   item: ContentItem;
@@ -25,6 +26,7 @@ export function DetailHero({
   onFavoriteToggle,
   onDownload,
 }: DetailHeroProps) {
+  const t = useT();
   const [imgError, setImgError] = useState(false);
   const posterSrc = metadata.tmdbPosterUrl || item.logoUrl;
   const backdropSrc = metadata.tmdbBackdropUrl || item.logoUrl;
@@ -248,7 +250,7 @@ export function DetailHero({
               <button
                 onClick={onDownload}
                 className="flex items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-800/40 px-4 py-2.5 text-sm font-medium text-surface-300 transition-all hover:border-accent/40 hover:text-accent"
-                title="Download to disk"
+                title={t('action.downloadToDisk')}
               >
                 <svg
                   className="h-4 w-4"

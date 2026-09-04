@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { usePlayerStore } from '../stores/player-store';
 import type { Episode } from '../../shared/types';
+import { useT } from '../i18n';
 
 interface EpisodesTabProps {
   episodes: Episode[];
@@ -16,6 +17,7 @@ export function EpisodesTab({
   onEpisodePlay,
   onEpisodeDownload,
 }: EpisodesTabProps) {
+  const t = useT();
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [episodePositions, setEpisodePositions] = useState<
     Record<string, { positionSeconds: number; durationSeconds?: number }>
@@ -182,8 +184,8 @@ export function EpisodesTab({
                   onEpisodeDownload(ep);
                 }}
                 className="flex w-11 flex-shrink-0 items-center justify-center rounded-xl border border-accent/5 bg-surface-900/30 text-surface-500 opacity-0 transition-all hover:border-accent/30 hover:bg-surface-800/60 hover:text-accent group-hover/row:opacity-100"
-                title="Download this episode"
-                aria-label="Download episode"
+                title={t('action.downloadThisEpisode')}
+                aria-label={t('action.downloadEpisode')}
               >
                 <svg
                   className="h-4 w-4"
