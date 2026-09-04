@@ -43,7 +43,7 @@ internal object PlayerChromeMetrics {
      * target below what a D-pad user can pick out — and are deliberately NOT
      * part of the design.
      */
-    fun hexSizeDp(variant: HexVariant, screenWidthDp: Float): Float {
+    fun hexSizeDp(variant: HexVariant, screenWidthDp: Float, touch: Boolean = false): Float {
         val ratio = when (variant) {
             HexVariant.HERO -> 0.0432f
             HexVariant.TRANSPORT -> 0.0292f
@@ -51,13 +51,33 @@ internal object PlayerChromeMetrics {
             HexVariant.MENU_ICON -> 0.0156f
         }
         val floor = when (variant) {
-            HexVariant.HERO -> 40f
-            HexVariant.TRANSPORT -> 27f
-            HexVariant.SECONDARY -> 25f
+            HexVariant.HERO -> if (touch) TOUCH_TARGET_DP else 40f
+            HexVariant.TRANSPORT -> if (touch) TOUCH_TARGET_DP else 27f
+            HexVariant.SECONDARY -> if (touch) TOUCH_TARGET_DP else 25f
+            // Not a target — the glyph inside a larger control — so it is not
+            // held to the touch minimum.
             HexVariant.MENU_ICON -> 18f
         }
         return (screenWidthDp * ratio).coerceAtLeast(floor)
     }
+
+    /**
+     * MK.37.F — the floor for a control reached with a **finger**.
+     *
+     * The floors above were written for a D-pad, and the comment on them says
+     * so: they stop a focus target shrinking below what a remote user can pick
+     * out at three metres. A finger has a different minimum, and Android's is
+     * **48 dp**.
+     *
+     * This was already wrong before portrait existed. Every one of the brief's
+     * ratios is against a 1920 px television, so on a phone in landscape
+     * (731 dp) *every* control already falls to its floor: transport at 27 dp,
+     * secondary at 25 dp — a little over half the minimum touch target, on the
+     * one form factor where they are touched rather than focused. Portrait
+     * (411 dp) does not create the problem, it only makes every control sit
+     * there.
+     */
+    const val TOUCH_TARGET_DP = 48f
 
     /** Brief: 24-32px horizontal padding at 1920. */
     fun dockPaddingDp(screenWidthDp: Float): Float = (screenWidthDp * 0.0146f).coerceAtLeast(10f)

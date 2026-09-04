@@ -3535,6 +3535,55 @@ for channels the sample sources carry no EPG for. Chromecast still renders the *
 headers present, no list text, 0 fatals. `GuideListTest` covers the seam, the gap, the empty channel
 and the zero-length programme.
 
+### MK.37.F — the player rotates, and its controls become touchable — shipped 2026-09-04
+
+`PlayerActivity` moves from `sensorLandscape` to `fullUser`. MB-354 had pinned both activities to
+`sensorLandscape` to fix a real defect — they disagreed, so a phone held in reverse-landscape
+browsed upright and then played video upside-down. That fix stands; what changed is that
+MainActivity became `fullUser` in MK.37.A, so pinning the player would have recreated the same
+disagreement from the other side: browse in portrait, then a forced rotation on every play.
+`fullUser` honours the viewer's own rotation lock, so anyone who wants video landscape-only gets it
+from the system switch they already use. A television never reports a rotation, so this is inert
+there. `configChanges` already carried the orientation set, so the player has never recreated on a
+rotation and does not start now — which matters more here than in the shell, because a recreation
+mid-stream would rebuild the ExoPlayer and rebuffer.
+
+**And a defect that predates portrait entirely.** `PlayerChromeMetrics` sizes every control as a
+fraction of screen width against a 1920 px television, with floors underneath. The floors were
+written for a **D-pad** — the file says so: they stop a focus target shrinking below what a remote
+user can pick out at three metres. A finger has a different minimum, and Android's is 48 dp.
+
+Measured across the ratios:
+
+| | hero | transport | secondary |
+|---|---|---|---|
+| Fire TV, 960 dp | 41.5 | 28.0 | 26.0 |
+| phone landscape, 731 dp | **40 (floor)** | **27 (floor)** | **25 (floor)** |
+| phone portrait, 411 dp | **40 (floor)** | **27 (floor)** | **25 (floor)** |
+
+So on a phone in **landscape** — shipping today, before any of this — every control already sat on
+a floor, and transport at 27 dp is a little over half the minimum touch target on the one form
+factor where controls are touched rather than focused. Portrait did not create that; it only makes
+every control sit there.
+
+`hexSizeDp` now takes a `touch` flag and raises the floor to 48 dp for the three control variants.
+`MENU_ICON` is left alone — it is the glyph inside a larger control, not a target.
+
+**The gate is on `isTv`, not on width, and there is a test that says why.** A television is 960 dp
+wide and its hero comes out at 41.5 dp — *below* 48 — so the touch floor would move the
+television's own numbers if it were applied there, and any rule deciding "touch" from a width
+threshold would eventually catch a wide TV.
+
+Verified on the Pixel XL, playing a real file in portrait: window `1440x2560`, `PlayerActivity`
+focused, 0 fatals, and every control measured at exactly 48 dp — Rewind, Pause, Forward, CC, Back,
+More options, Cast; AUDIO at 53.7 dp. Both televisions relaunched at `1920x1080` with 0 fatals.
+
+**Found while verifying, not fixed here:** `ContentDetailScreen` is still on the television's
+two-pane layout in portrait — its content sits at x=952 of a 1440 px screen, pushed into the right
+half with the left half empty. MK.37.D covered Home's rails and hero but not the detail page. It
+needs the same `usesCoverflow`-style split the browse screen got (one column when the lane is tall)
+and is its own slice.
+
 ### Remaining slices
 
 | Slice | Scope |

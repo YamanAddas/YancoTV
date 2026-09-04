@@ -219,9 +219,16 @@ internal data class HexMetrics(val size: Dp, val borderWidth: Dp)
 
 @Composable
 internal fun hexMetrics(variant: HexVariant): HexMetrics {
-    val widthDp = LocalConfiguration.current.screenWidthDp.toFloat()
+    val config = LocalConfiguration.current
+    val widthDp = config.screenWidthDp.toFloat()
+    // MK.37.F — a control reached with a finger has a bigger minimum than one
+    // reached with a D-pad. Keyed off the device being a television rather than
+    // off width, because a phone in landscape is wide and still touched.
+    val isTv =
+        (config.uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK) ==
+            android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
     return HexMetrics(
-        size = PlayerChromeMetrics.hexSizeDp(variant, widthDp).dp,
+        size = PlayerChromeMetrics.hexSizeDp(variant, widthDp, touch = !isTv).dp,
         borderWidth = if (variant == HexVariant.HERO) 2.dp else 1.dp,
     )
 }

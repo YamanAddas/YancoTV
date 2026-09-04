@@ -151,4 +151,62 @@ class PlayerChromeMetricsTest {
         val usable = narrow - 96f
         assertTrue(total < usable, "dock needs ${total}dp of ${usable}dp available at ${narrow}dp")
     }
+
+    // ───── MK.37.F — touch floors ─────
+
+    /**
+     * **Why the gate is on `isTv` and not on width.**
+     *
+     * A television is 960 dp wide and its hero comes out at 41.5 dp — *below*
+     * the 48 dp touch minimum. So the touch floor would move the television's
+     * own numbers if it were applied there, and any rule that decided "touch"
+     * from a width threshold would eventually catch a wide TV. The call site
+     * keys off the device being a television; this test is what says so.
+     */
+    @Test
+    fun `the touch floor would change a television, which is why the gate is not width`() {
+        val asTv = PlayerChromeMetrics.hexSizeDp(HexVariant.HERO, tvWidthDp)
+        val asTouch = PlayerChromeMetrics.hexSizeDp(HexVariant.HERO, tvWidthDp, touch = true)
+        assertTrue(asTv < PlayerChromeMetrics.TOUCH_TARGET_DP, "TV hero was $asTv")
+        assertTrue(asTouch > asTv, "touch floor should raise it, got $asTouch")
+    }
+
+    /** The floor only ever raises; it can never shrink a control. */
+    @Test
+    fun `the touch floor never shrinks anything`() {
+        for (widthDp in listOf(320f, 411f, 731f, 960f, 1920f)) {
+            for (v in HexVariant.entries) {
+                assertTrue(
+                    PlayerChromeMetrics.hexSizeDp(v, widthDp, touch = true) >=
+                        PlayerChromeMetrics.hexSizeDp(v, widthDp),
+                    "$v at ${widthDp}dp shrank under the touch floor",
+                )
+            }
+        }
+    }
+
+    /**
+     * The defect this fixes, and it predates portrait: every ratio is against a
+     * 1920 px television, so on a phone in LANDSCAPE every control already fell
+     * to a floor written for a D-pad — transport at 27 dp against Android's
+     * 48 dp minimum touch target.
+     */
+    @Test
+    fun `a phone gets touch-sized controls in both orientations`() {
+        for (widthDp in listOf(731f, 411f)) {
+            for (v in listOf(HexVariant.HERO, HexVariant.TRANSPORT, HexVariant.SECONDARY)) {
+                val size = PlayerChromeMetrics.hexSizeDp(v, widthDp, touch = true)
+                assertTrue(
+                    size >= PlayerChromeMetrics.TOUCH_TARGET_DP,
+                    "$v at ${widthDp}dp was $size, under the 48dp touch minimum",
+                )
+            }
+        }
+    }
+
+    /** The menu glyph sits inside a larger control, so it is not a target. */
+    @Test
+    fun `the menu icon is not inflated to a touch target`() {
+        assertTrue(PlayerChromeMetrics.hexSizeDp(HexVariant.MENU_ICON, 411f, touch = true) < 48f)
+    }
 }

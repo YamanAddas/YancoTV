@@ -209,11 +209,26 @@
              upside-down on entering fullscreen. Both are `sensorLandscape`
              now: still landscape-only, but consistent about which way up.
              No effect on TV, where the sensor never reports a rotation. -->
+        <!-- MK.37.F — the player rotates too.
+             MB-354 pinned both activities to `sensorLandscape` to fix a real
+             defect: they disagreed, so a phone held in reverse-landscape browsed
+             upright and then played video upside-down. That fix stands; what
+             changes is that MainActivity is now `fullUser` (MK.37.A), so pinning
+             the player would recreate the same disagreement from the other side —
+             browse in portrait, then a forced rotation on every play.
+
+             `fullUser` honours the viewer's own rotation lock, so anyone who
+             wants video landscape-only gets it from the system switch they
+             already use. A television never reports a rotation, so this is inert
+             there. `configChanges` already carried the orientation set, so the
+             player has never recreated on a rotation and does not start now —
+             which matters far more here than in the shell, because a recreation
+             mid-stream would rebuild the ExoPlayer and rebuffer. -->
         <activity
             android:name=".player.PlayerActivity"
             android:exported="false"
             android:launchMode="singleTask"
-            android:screenOrientation="sensorLandscape"
+            android:screenOrientation="fullUser"
             android:theme="@style/PlayerTheme"
             android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode|smallestScreenSize" />
