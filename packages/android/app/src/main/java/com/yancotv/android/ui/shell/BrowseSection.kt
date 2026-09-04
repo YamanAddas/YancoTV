@@ -1,6 +1,8 @@
 package com.yancotv.android.ui.shell
 
 import android.util.Log
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -28,6 +31,7 @@ import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.yancotv.android.ui.theme.LocalShellMetrics
 import org.koin.compose.koinInject
 
 /**
@@ -315,6 +319,53 @@ fun BrowseSection(
     }
 
     val categoriesVisible = panelFocus != PanelFocus.Content
+
+    // MK.37.C — a phone in portrait cannot host the standing rail: 240 dp is
+    // 60% of its width. It gets `CategoryDrawer` above the content instead —
+    // a strip you pull down into a grid. The rule is the shell's, not this
+    // screen's, so the rail and the drawer cannot both appear.
+    val shellMetrics = LocalShellMetrics.current
+    if (!shellMetrics.usesSidebar) {
+        val repo: ContentRepository = koinInject()
+        val type = type
+        var entries by remember(type) { mutableStateOf<List<CategoryEntry>>(emptyList()) }
+        var total by remember(type) { mutableIntStateOf(0) }
+        // Hard rule 3 — SQLDelight blocks, so this never runs in composition.
+        LaunchedEffect(type) {
+            val loaded =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        repo.groupTallies(type).map { (name, count) -> CategoryEntry(name, count) } to
+                            repo.count(type).toInt()
+                    }.getOrElse { emptyList<CategoryEntry>() to 0 }
+                }
+            entries = loaded.first
+            total = loaded.second
+        }
+
+        Column(modifier = modifier.fillMaxSize()) {
+            CategoryDrawer(
+                entries = entries,
+                totalCount = total,
+                selected = selectedGroup,
+                onSelect = { selectedGroup = it },
+            )
+            CoverflowSectionScreen(
+                type = type,
+                selectedGroup = selectedGroup,
+                mergedGroups = mergedGroupMap,
+                onActivate = onActivate,
+                onPlayNow = onPlayNow,
+                entryFocus = coverflowFocus,
+                onExitToCategories = { onPanelFocusChanged(PanelFocus.Categories) },
+                onPanelFocusChanged = { hasFocus -> if (hasFocus) onPanelFocusChanged(PanelFocus.Content) },
+                restoreFocusOnWindowRegain = restoreFocusOnWindowRegain,
+                onAddSource = onAddSource,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
+        }
+        return
+    }
 
     Row(modifier = modifier.fillMaxSize()) {
         if (categoriesVisible) {

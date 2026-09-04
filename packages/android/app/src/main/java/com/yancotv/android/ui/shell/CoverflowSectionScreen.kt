@@ -30,6 +30,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,6 +76,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
@@ -88,6 +92,7 @@ import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.focus.tvLongClickable
 import com.yancotv.android.ui.parental.ChannelActionsMenu
+import com.yancotv.android.ui.theme.LocalShellMetrics
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
@@ -586,7 +591,31 @@ fun CoverflowSectionScreen(
     // second child of BrowseSection's Row — measured in the unweighted pass,
     // taking all remaining width, and leaving the weighted coverflow Column
     // with zero.
+    val shellMetrics = LocalShellMetrics.current
+
     Box(modifier = modifier.fillMaxSize()) {
+        if (!shellMetrics.usesCoverflow) {
+            // MK.37.C — a tall lane gets a grid.
+            //
+            // Preview-over-wheel assumes a lane wider than it is tall: artwork
+            // beside its metadata, wheel as a band along the bottom. Give it a
+            // tall lane and the proportions invert — the preview pane is handed
+            // height for content that does not need it and spends the surplus
+            // on voids, and the wheel shows three titles where a grid shows
+            // twelve. `usesCoverflow` reads the lane, not the device, so an
+            // upright tablet lands here too.
+            ContentGrid(
+                items = visible,
+                type = type,
+                lockedIds = lockedIds,
+                nowNextMap = nowNextMap,
+                watchProgress = watchProgress,
+                onActivate = { idx -> onActivate(visible.toList(), idx) },
+                onLongPress = { item -> actionsFor = item },
+                onLastVisible = { idx -> lastVisibleIndex = idx },
+            )
+            return@Box
+        }
         Column(
             modifier =
             Modifier
@@ -1559,6 +1588,74 @@ private val OrbWidth = 140.dp
 private val OrbHeight = 200.dp
 private val OrbSpacing = 28.dp
 
+/**
+ * The portrait browse grid.
+ *
+ * Twelve titles where the wheel showed three, and no gap by construction — the
+ * preview pane's voids on a tall lane are what this exists to remove.
+ *
+ * Columns come from the width the grid actually gets, so an SE, a Pro Max and a
+ * tablet each fill their own width instead of sharing a hard-coded count. The
+ * cell is the art box; [ContentOrb] adds its two label lines underneath.
+ */
+@Composable
+private fun ContentGrid(
+    items: List<ContentItem>,
+    type: ContentType,
+    nowNextMap: Map<String, NowNext>,
+    lockedIds: Set<String>,
+    watchProgress: Map<String, WatchProgress>,
+    onActivate: (Int) -> Unit,
+    onLongPress: (ContentItem) -> Unit,
+    onLastVisible: (Int) -> Unit,
+) {
+    val metrics = LocalShellMetrics.current
+    val columns = 3
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val cell = (maxWidth - metrics.pageInset * 2 - Space.md * (columns - 1)) / columns
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding =
+            androidx.compose.foundation.layout.PaddingValues(
+                start = metrics.pageInset,
+                end = metrics.pageInset,
+                top = Space.md,
+                bottom = Space.section,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(Space.md),
+            verticalArrangement = Arrangement.spacedBy(Space.lg),
+        ) {
+            itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
+                ContentOrb(
+                    item = item,
+                    type = type,
+                    // Every cell is drawn at rest: the wheel's depth transform
+                    // is about a focused centre, and a grid has no centre.
+                    distance = 0,
+                    isLocked = item.id in lockedIds,
+                    nowNext = item.tvgId?.let { nowNextMap[it] },
+                    progress = watchProgress[item.id],
+                    placedAnchor = null,
+                    entryFocus = null,
+                    onFocus = {},
+                    onActivate = { onActivate(index) },
+                    onLongPress = { onLongPress(item) },
+                    art = cell,
+                    // Art plus the two label lines, rather than the wheel's
+                    // fixed 200 dp band — which is what clipped the caption off
+                    // every orb in MB-401.
+                    slot = cell + 64.dp,
+                )
+                // The grid has no centred item to page from, so depth reached
+                // IS the trigger — the same signal the wheel derives from its
+                // last visible index.
+                onLastVisible(index)
+            }
+        }
+    }
+}
+
 @Composable
 private fun ContentCoverflow(
     items: List<ContentItem>,
@@ -1640,6 +1737,19 @@ private fun ContentOrb(
     onFocus: () -> Unit,
     onActivate: () -> Unit,
     onLongPress: () -> Unit,
+    /**
+     * MK.37.C — edge of the square art box.
+     *
+     * The wheel keeps the television's 140 dp; the portrait grid sizes cells
+     * from the lane it actually has and passes that in. The orb was hard-wired
+     * to [OrbWidth], which is a Fire TV number and 34% of a phone's width.
+     */
+    art: Dp = OrbWidth,
+    /**
+     * Total height. The wheel's orbs are all the same height so the band is
+     * even; a grid cell only needs the art plus its two label lines.
+     */
+    slot: Dp = OrbHeight,
 ) {
     // MK.31.22 — the semantics builder below is not composable scope.
     val ctx = LocalContext.current
@@ -1691,8 +1801,8 @@ private fun ContentOrb(
     Column(
         modifier =
         Modifier
-            .width(OrbWidth)
-            .height(OrbHeight)
+            .width(art)
+            .height(slot)
             .graphicsLayer {
                 this.rotationY = rotationY
                 scaleX = scale
@@ -1707,7 +1817,7 @@ private fun ContentOrb(
         Box(
             modifier =
             Modifier
-                .size(OrbWidth)
+                .size(art)
                 .shadow(
                     elevation = if (focused) 28.dp else 6.dp,
                     shape = YancoShapes.HexCapsule,

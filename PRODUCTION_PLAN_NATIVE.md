@@ -3289,6 +3289,72 @@ window, so the last destinations sit below the fold. `AppSidebar` already scroll
 (`verticalScroll`), so they are reachable — but a phone in landscape having to scroll a navigation
 rail is worth revisiting when 37.D touches sizing.
 
+### MK.37.C — the category drawer and the portrait grid — shipped 2026-09-04
+
+The two compositions a tall lane needs, ported from the iOS shell the owner asked us to match.
+
+**`CategoryDrawer`** — the category surface for a phone held upright. `CategoryRail` is a 240 dp
+standing column, 60% of a phone's portrait width, so portrait cannot have it; and a horizontal strip
+alone is not the answer either, because a real account here ships **855 live categories** and a
+strip shows four at a time with no sense of how far the rest run. Collapsed it is one line you can
+scroll sideways; pulled open it becomes a grid where a flick covers rows rather than columns.
+
+Three detents — "just the strip", "enough to browse without losing the content behind", and "the
+whole list". Verified on the Pixel XL: collapsed shows 3 tiles reaching y=378, full shows **20 tiles
+reaching y=1860 of 2560 — 73% of the screen**, with the content grid still visible beneath.
+
+**Detents are proportional here, and that is a deliberate divergence.** iOS hard-codes 114 / 300 /
+560, which is safe because iPhones are all roughly 844 pt tall. Android is not: on a 568 dp phone a
+fixed 560 dp drawer is **99% of the screen** and buries the content it exists to filter. Half and
+Full are fractions of the window (0.40 / 0.72) clamped at both ends. Collapsed stays absolute
+because it is sized by what it must *show* — header, one name-over-count tile, grabber — not by what
+the window can spare. Measured 526 dp on the 731 dp test phone, which matches the reference
+screenshots' proportion.
+
+**Both layers stay mounted and cross-fade on how far open the drawer is.** Choosing between strip
+and grid with an `if` cost the iOS original one of two things: deciding on the *live* height rebuilt
+the subtree mid-gesture and the drag snagged; deciding on the *settled* height left the categories
+missing for the whole length of the pull ("اول سحبة مابتطالع"). Moving only opacity has neither
+problem — nothing is created or destroyed while the finger is down, and the grid is lazy, so
+collapsed it builds only the row that fits.
+
+The whole collapsed strip drags, not just the grabber; reaching for a 46x18 target on a border is
+not how anyone opens a drawer. Safe because the strip scrolls *horizontally*, so a vertical drag has
+nothing to collide with.
+
+**The tile is typography, not a container** — no fill, no border. The name is the object at full
+contrast, the count small and muted underneath, and selection is a 2 dp accent rule down the leading
+edge plus the name in accent. The bevelled accent-washed chip this replaces was rejected outright
+("تصميم الفريم تبع أسماء الكاتيجوريز و لونو كتير سيء ومرفوض"). The rule is measured by the text
+beside it rather than the row it sits in: as a plain sibling it had a width and no height, so while
+the drawer was dragged it ran the drawer's full height.
+
+**`ContentGrid`** — three columns of `ContentOrb`, replacing preview-over-wheel wherever the lane is
+tall. `ContentOrb` gained `art` and `slot` parameters: it was hard-wired to `OrbWidth` (140 dp, a
+Fire TV number, 34% of a phone's width) and to the 200 dp band whose fixed height clipped the
+caption off every orb in MB-401. A grid cell asks for art plus its two label lines and nothing more.
+Every cell draws at rest — the wheel's depth transform is about a focused centre and a grid has no
+centre.
+
+`BrowseSection` chooses between `Row(rail, coverflow)` and `Column(drawer, grid)` on
+`ShellMetrics.usesSidebar`; `CoverflowSectionScreen` chooses grid over wheel on `usesCoverflow`.
+Both read the shell's rule, so a rail and a drawer can never both appear. Category counts come from
+`ContentRepository.groupTallies` — one of the queries MK.36.1 brought over — loaded off the main
+thread per hard rule 3.
+
+Verified on hardware:
+
+| | result |
+|---|---|
+| Pixel XL portrait | drawer + 3-column grid; three detents all reachable; tap toggles, drag settles to nearest |
+| Fire TV AFTDCT31 | `Home [40,160][160,264]` — byte-identical to baseline; no drawer composed; 0 fatals |
+| Chromecast | unchanged; no drawer composed; 0 fatals |
+
+`cd_categories` / `cd_favorites` / `cd_all` are translated in all four shipped locales.
+
+**Still open.** Home's rails and the detail page keep the Fire TV numbers — a Home tile is still
+770 px of a 1440 px screen. That is 37.D, and it is the last thing making portrait look stretched.
+
 ### Remaining slices
 
 | Slice | Scope |
