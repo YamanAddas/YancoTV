@@ -14,7 +14,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
-import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -242,28 +241,14 @@ class PlayerActivity : AppCompatActivity() {
 
     private lateinit var playerView: PlayerView
 
-    // Zap bar
-    private lateinit var zapBar: View
-    private lateinit var zapLiveDot: View
-    private lateinit var zapLiveLabel: TextView
-    private lateinit var zapChannelName: TextView
-    private lateinit var zapNow: TextView
-    private lateinit var zapNext: TextView
-
-    // Quick info
+    // Quick info (stream diagnostics)
     private lateinit var quickInfo: View
     private lateinit var qiResolution: TextView
     private lateinit var qiCodec: TextView
     private lateinit var qiBitrate: TextView
     private lateinit var qiBuffer: TextView
 
-    // Program progress
-    private lateinit var progressRow: View
-    private lateinit var ppTitle: TextView
-    private lateinit var ppTime: TextView
-    private lateinit var ppBar: ProgressBar
-
-    // Jump-to-LIVE (MK.8.2 timeshift)
+    // Jump-to-LIVE affordance
     private lateinit var liveJumpBar: View
     private lateinit var liveOffsetLabel: TextView
     private lateinit var liveJumpButton: Button
@@ -700,23 +685,11 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
 
-        zapBar = findViewById(R.id.zap_bar)
-        zapLiveDot = findViewById(R.id.zap_live_dot)
-        zapLiveLabel = findViewById(R.id.zap_live_label)
-        zapChannelName = findViewById(R.id.zap_channel_name)
-        zapNow = findViewById(R.id.zap_now)
-        zapNext = findViewById(R.id.zap_next)
-
         quickInfo = findViewById(R.id.quick_info)
         qiResolution = findViewById(R.id.qi_resolution)
         qiCodec = findViewById(R.id.qi_codec)
         qiBitrate = findViewById(R.id.qi_bitrate)
         qiBuffer = findViewById(R.id.qi_buffer)
-
-        progressRow = findViewById(R.id.program_progress_row)
-        ppTitle = findViewById(R.id.pp_title)
-        ppTime = findViewById(R.id.pp_time)
-        ppBar = findViewById(R.id.pp_bar)
 
         liveJumpBar = findViewById(R.id.live_jump_bar)
         liveOffsetLabel = findViewById(R.id.live_offset_label)
@@ -753,27 +726,24 @@ class PlayerActivity : AppCompatActivity() {
         castOverlayDevice = findViewById(R.id.cast_overlay_device)
         castOverlayStop = findViewById(R.id.cast_overlay_stop)
         castOverlayStop.setOnClickListener { castController.stopCasting() }
-        // The Back button shares the top-start corner with the zap bar on
-        // live; nudge the zap bar right (phone only) so they don't overlap.
-        // Form factor is fixed at runtime, so do it once.
-        if (!isTvDevice()) {
-            (zapBar.layoutParams as? android.widget.FrameLayout.LayoutParams)?.let {
-                it.marginStart = (76 * resources.displayMetrics.density).toInt()
-                zapBar.layoutParams = it
-            }
-        }
-
         // MK.28.1 — the window now extends into the display cutout (see the
         // SHORT_EDGES block above), which is right for the video but wrong
         // for the corner chrome: the fixed-landscape rotation can put the
         // camera hole exactly where the phone Back button renders. Offset the
         // corner overlays by the cutout insets on top of their layout-time
-        // base margins (captured AFTER the phone zap nudge above so the 76dp
-        // base survives). System-bar insets are 0 while the bars are hidden,
+        // base margins. System-bar insets are 0 while the bars are hidden,
         // so cutout is the only component; TVs report none → no-op.
         run {
             val corners: List<View> =
-                listOf(backButton, zapBar, findViewById(R.id.recording_indicator))
+                // The explicit <View> is load-bearing. `listOf` builds a vararg
+                // array of the arguments' common type, and with the zap bar gone
+                // the only other element is an ImageButton — so Kotlin inferred
+                // findViewById<ImageButton>, the vararg array became
+                // ImageButton[], and storing the recording indicator's
+                // ComposeView in it threw ArrayStoreException at PlayerActivity
+                // start. The declared List<View> above does not prevent it, and
+                // neither the compiler, ktlint nor a unit test says a word.
+                listOf(backButton, findViewById<View>(R.id.recording_indicator))
             val bases =
                 corners.associateWith { v ->
                     val lp = v.layoutParams as ViewGroup.MarginLayoutParams
@@ -842,7 +812,7 @@ class PlayerActivity : AppCompatActivity() {
         playerView.setControllerVisibilityListener(
             PlayerView.ControllerVisibilityListener { visibility ->
                 controllerVisible = (visibility == View.VISIBLE)
-                applyOverlayVisibility()
+                updatePlayerChrome()
             },
         )
 
@@ -1084,16 +1054,13 @@ class PlayerActivity : AppCompatActivity() {
             // window is visible.
             upNextFlow.value = UpNextCardData()
             playerView.useController = false
-            zapBar.visibility = View.GONE
             quickInfo.visibility = View.GONE
-            progressRow.visibility = View.GONE
             liveJumpBar.visibility = View.GONE
         } else {
             playerView.useController = true
             // Let the next poll tick / state change re-surface the
-            // overlays that should be visible in fullscreen. controller
-            // visibility callback handles zapBar + progressRow.
-            applyOverlayVisibility()
+            // overlays that should be visible in fullscreen.
+            updatePlayerChrome()
         }
     }
 
@@ -1197,40 +1164,24 @@ class PlayerActivity : AppCompatActivity() {
         networkRetryAttempted = false
         networkRetryJob?.cancel()
         networkRetryJob = null
-        // MK.16.player.vod.dock — LIVE keeps Media3's built-in controller
-        // (needed for the zap bar / program-progress overlays to ride
-        // alongside it). VOD (movie / episode) disables the built-in one
-        // because the Compose dock replaces it. Re-apply on every item
-        // change so a zap from VOD → LIVE or back flips the control surface.
+        // MK.16.player.vod.dock — LIVE kept Media3's built-in controller so the
+        // zap bar and programme-progress overlays had something to ride with.
+        // MK.38 gave both kinds the same Compose dock, and MK.38.3 deleted those
+        // two overlays: the dock's own metadata block and LiveProgrammeRow say
+        // the same things, in the same visual language, in one place. With no
+        // item at all there is nothing to dock, so Media3's controller stays as
+        // the fallback.
         val isLive = item?.type == ContentType.LIVE
-        // MK.38 — LIVE no longer keeps Media3's built-in controller. It kept it
-        // because the zap bar and programme row rode alongside it; those now
-        // ride with the dock, so both content kinds present the same surface.
-        // With no item at all there is nothing to dock, so Media3's controller
-        // stays as the fallback.
         playerView.useController = (item == null)
         dockIsLive = isLive
         if (item == null) {
-            zapBar.visibility = View.GONE
-            progressRow.visibility = View.GONE
             updatePlayerChrome()
             return
         }
-        val displayTitle = item.cleanTitle?.ifBlank { null } ?: item.title
-        zapChannelName.text = displayTitle
-        zapLiveDot.visibility = if (isLive) View.VISIBLE else View.GONE
-        zapLiveLabel.visibility = if (isLive) View.VISIBLE else View.GONE
-        zapNow.visibility = View.GONE
-        zapNext.visibility = View.GONE
-        // zap bar is chromed-in by the controller-visibility listener; we
-        // no longer force the controller open on channel change (see the
-        // `controllerAutoShow = false` decision above).
-        // MK.38 — rides with the dock now, not Media3's controller.
-        zapBar.visibility = if (dockVisible) View.VISIBLE else View.GONE
 
         val tvgId = item.tvgId?.takeIf { it.isNotBlank() }
         if (!isLive || tvgId == null) {
-            applyOverlayVisibility()
+            updatePlayerChrome()
             return
         }
         lifecycleScope.launch {
@@ -1247,25 +1198,11 @@ class PlayerActivity : AppCompatActivity() {
             val next = nn?.next
             currentProgramme = now
             nextProgrammeTitle = next?.title
-            zapNow.text = now?.title?.let { "Now: $it" }.orEmpty()
-            zapNow.visibility = if (now != null) View.VISIBLE else View.GONE
-            zapNext.text = next?.title?.let { "Next: $it" }.orEmpty()
-            zapNext.visibility = if (next != null) View.VISIBLE else View.GONE
+            // The dock reads these through renderProgramProgress(); nothing
+            // else renders now/next any more.
             renderProgramProgress()
-            applyOverlayVisibility()
+            updatePlayerChrome()
         }
-    }
-
-    private fun applyOverlayVisibility() {
-        zapBar.visibility = if (dockVisible && controller.currentId != null) View.VISIBLE else View.GONE
-        val liveWithEpg =
-            currentProgramme != null &&
-                controller.currentItem.value?.type == ContentType.LIVE
-        // MK.38 — superseded by the dock's LiveProgrammeRow, which sits where
-        // the seek ribbon does on a film. Kept in the layout rather than deleted
-        // so this is one reversible commit; it renders nothing now.
-        progressRow.visibility = View.GONE
-        updatePlayerChrome()
     }
 
     /**
@@ -1337,7 +1274,6 @@ class PlayerActivity : AppCompatActivity() {
     private fun renderProgramProgress() {
         val prog =
             currentProgramme ?: run {
-                progressRow.visibility = View.GONE
                 dockProgramme = null
                 return
             }
@@ -1347,15 +1283,12 @@ class PlayerActivity : AppCompatActivity() {
         val remainingMin = ((prog.endTime - nowSec).coerceAtLeast(0) / 60L).toInt()
         val totalMin = ((total + 59L) / 60L).toInt()
         val pct = ((elapsed.toDouble() / total) * 1000.0).roundToInt().coerceIn(0, 1000)
-        ppTitle.text = prog.title
-        ppTime.text = getString(R.string.pa_programme_time, remainingMin, totalMin)
-        ppBar.progress = pct
-
-        // MK.38 — the same numbers feed the dock's live row. Computed once,
-        // here, rather than again inside the composition: `prog.startTime` and
-        // `endTime` are XMLTV epoch SECONDS, and a second site doing its own
-        // clock arithmetic is how two parts of one screen come to disagree
-        // about how far through a programme you are.
+        // MK.38 — these numbers feed the dock's live row, and since MK.38.3
+        // nothing else. Computed once, here, rather than again inside the
+        // composition: `prog.startTime` and `endTime` are XMLTV epoch SECONDS,
+        // and a second site doing its own clock arithmetic is how two parts of
+        // one screen come to disagree about how far through a programme you
+        // are.
         dockProgramme =
             DockProgramme(
                 nowTitle = prog.title,
@@ -1368,7 +1301,6 @@ class PlayerActivity : AppCompatActivity() {
             // can replace it. Cheap safety; a proper refresh happens on the
             // next channel change or when the user re-opens EPG.
             currentProgramme = null
-            progressRow.visibility = View.GONE
             dockProgramme = null
         }
     }
