@@ -3940,7 +3940,33 @@ cannot disagree — and the device confirmed the formula exactly: CC 52 px, AUDI
 gap 15 px, which are the numbers the fit calculation uses. At 1920 there is ~500 dp of headroom, so
 nothing drops on a television and the TV render is unchanged.
 
-**Seen on glass, at a size the dock cannot fit.** `wm size 1280x720` on the Google TV (reset
+**Measured on the owner's Pixel XL, 2026-09-04 — and it was not insurance, it was a live bug.**
+
+The player carries `android:screenOrientation="fullUser"`, so a phone renders it in **portrait**
+whenever the phone is held that way. That is 411 dp of width, not the 731 dp of landscape, and the
+row needs ~558 dp. The overflow path is therefore on the ordinary phone case, today.
+
+With the fix, on `Big Buck Bunny` at 1440x2560 / density 560:
+
+    -10   ⏸   +10   |   CC   ⋯          AUDIO, SPEED, FIT, FAV → the menu
+
+Every control measured 168 px = 48 dp (the touch floor), gaps 18 px = 5 dp, available 295 dp,
+rendered 274 dp — and adding AUDIO would reach 333 dp. `fitDockControls` predicted exactly that set.
+
+Then the same phone with only the measurement removed (one line, `fit.shown` back to
+`dockControlOrder`), to see what was actually shipping:
+
+| Control | Bounds without the fit |
+|---|---|
+| SPEED | `[1203,2343][1237,2511]` — **34 px wide**, crushed against the edge |
+| FIT, FAV | **absent from the tree** |
+| **MENU** | **`[0,0][0,0]`** |
+
+So on a phone in portrait the ⋯ control was a zero-size node: not clipped, not small — gone, and with
+it the only route to Audio, Speed, Aspect and Favourites. There was no workaround, and nothing in
+the tree said anything was missing.
+
+**Also seen on glass, at a size the dock cannot fit.** `wm size 1280x720` on the Google TV (reset
 immediately after) rendered: `-10`, play, `+10`, NEXT, `⋯` — all five secondaries dropped, the
 divider dropped with them because it then separated nothing, and `⋯` survived. That is exactly what
 `DockFitTest` asserts, now observed rather than argued.
@@ -3959,7 +3985,6 @@ which the 1920 render did confirm exactly: CC 52 px, AUDIO 81 px, FIT 61 px, gap
 | **37.C** | Browse portrait: grid composition + a pull-down category drawer (855 categories do not fit a strip). The dead `CategoryChipBar` is either the seed for this or should be deleted. |
 | **37.D** | Home + detail: hero and rails off the measured lane; detail one-column when the lane is tall. |
 | **37.E** | Guide portrait: now/next list instead of the timeline grid. |
-| **37.F** | Portrait player. Separate and deferred — `PlayerActivity` stays landscape until the shell is settled. |
 | **37.G** | Device pass: phone portrait + landscape, Fire TV and Google TV byte-compare. |
 
 ## Timeline
