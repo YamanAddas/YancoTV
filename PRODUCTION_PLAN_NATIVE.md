@@ -3974,6 +3974,19 @@ in the same frame. On a television the top bar is hidden and there would have be
 but on a television the row fits, so the case never arises. What the bug actually cost is the dock's
 own promise: five controls advertised, four of them silently not there.
 
+**Arabic, same phone.** The fit is identical to English — `-10`, play, `+10`, divider, `CC`, `⋯`,
+with `الصوت` / `السرعة` / `الملاءمة` / favourite in the menu — and the bounds match English to the
+pixel, because the row is pinned LTR (directional controls do not mirror) and `CC` is
+`translatable="false"`. Everything around it does mirror: the metadata block right-aligns, the phone
+chrome swaps corners, and the clock reads `٨:٠٣`.
+
+Two defects only an Arabic phone could show, both fixed in `MK.38.4`: `vd_pause` read `إيقاف مأقت`
+(the hamza belongs on the waw — `مؤقت`), and the -10 / +10 controls drew hardcoded ASCII numerals
+next to that Arabic-Indic clock. **Still outstanding, and a native speaker's call:** the
+`vd_rewind_10` / `vd_forward_10` accessibility strings keep a Western `10` inside Arabic text. It is
+never rendered, and a TTS voice says عشرة either way, so it was left alone rather than edited on a
+guess.
+
 **Also seen on glass, at a size the dock cannot fit.** `wm size 1280x720` on the Google TV (reset
 immediately after) rendered: `-10`, play, `+10`, NEXT, `⋯` — all five secondaries dropped, the
 divider dropped with them because it then separated nothing, and `⋯` survived. That is exactly what
