@@ -17,7 +17,12 @@ export function findFfmpegPath(): string | null {
   if (cachedPath !== undefined) return cachedPath;
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // The rule was renamed: `no-var-requires` became `no-require-imports` in
+    // typescript-eslint v8, so the old disable comment stopped suppressing
+    // anything. The require itself is deliberate — `ffmpeg-static` resolves a
+    // path at call time and must not be hoisted into a static import, which
+    // would break the packaged app when the binary is absent.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const bundled: string | null = require('ffmpeg-static');
     if (bundled && fs.existsSync(bundled)) {
       log.info(`ffmpeg (bundled): ${bundled}`);

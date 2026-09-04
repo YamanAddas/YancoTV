@@ -44,7 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="max-w-lg space-y-4 rounded-2xl border border-red-500/20 bg-surface-900/80 p-6 shadow-2xl">
           <h1 className="text-lg font-semibold text-red-300">Something broke</h1>
           <p className="text-sm text-surface-300">
-            YancoTV hit an unexpected error and the current view couldn't render.
+            YancoTV hit an unexpected error and the current view couldn&apos;t render.
             The error was logged — you can export the log from Settings → Advanced.
           </p>
           <pre className="max-h-40 overflow-auto rounded-md bg-surface-950/80 p-3 text-xs text-surface-400">

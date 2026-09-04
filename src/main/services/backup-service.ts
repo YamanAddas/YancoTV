@@ -565,7 +565,7 @@ export function importBackup(backup: BackupFile, mode: ImportMode): ImportResult
   }
   const db = getDb();
   const warnings: string[] = [];
-  let stats: ImportStats = {
+  const stats: ImportStats = {
     sourcesImported: 0,
     favoritesImported: 0,
     favoritesSkipped: 0,

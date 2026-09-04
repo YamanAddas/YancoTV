@@ -249,7 +249,7 @@ export function AdvancedSettings() {
             <p className="text-sm font-medium text-surface-200">Restore backup</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Load a previously exported backup. Favorites and history are
-              re-linked to your current sources by stream URL — any that can't
+              re-linked to your current sources by stream URL — any that can&apos;t
               be matched will be skipped until you re-sync.
             </p>
           </div>

@@ -1,0 +1,133 @@
+name: Desktop tests
+
+# The Electron/desktop app had NO continuous integration of any kind. The two
+# existing workflows are path-filtered to `packages/android/**` and
+# `packages/shared/**`, so nothing typechecked, linted, tested or built `src/`,
+# `packages/core/` or `tests/` on any push. Every desktop breakage found in the
+# 2026-09-04 session had been sitting in master unnoticed:
+#
+#   * `pnpm install` could not complete at all (pnpm 10+ stopped reading
+#     `pnpm.overrides` from package.json; with frozen-lockfile that is fatal).
+#   * `pnpm test` could not run a single test — three stacked breakages across
+#     npm and Node major versions.
+#   * `pnpm lint` errored on an ESLint 9 flag that no longer exists, and five
+#     real lint errors had accumulated behind it.
+#   * Three test files were failing against correct production code.
+#
+# Every one of those is the kind of thing a CI run catches on the commit that
+# introduces it. None were caught, because nothing ran.
+#
+# Scope — deliberately only commands verified to pass locally before this file
+# was written. A gate that is red on arrival gets ignored, and an ignored gate
+# is worse than none:
+#   * `pnpm typecheck`  — core + main + renderer, three separate tsconfigs.
+#   * `pnpm lint`       — ESLint. Errors gate; warnings do not (there is one
+#                         deliberate `no-console` in a dev-gated logger).
+#   * `pnpm test`       — 861 unit tests across 54 files.
+#   * `pnpm build`      — core → main → migrations → preload → renderer. Pins
+#                         that the app still BUILDS, not just typechecks.
+#
+# NOT in scope, with reasons rather than silence:
+#   * `pnpm test:e2e` (22 Playwright specs against a real Electron window).
+#     Electron needs a display server, so Linux CI needs xvfb, and this repo's
+#     postinstall only fetches mpv on Windows — so a Linux run exercises a
+#     configuration nobody ships. It passes locally on Windows and is worth
+#     adding once someone can verify the runner behaviour rather than guess at
+#     it. Adding it blind is how a suite becomes permanently red and ignored.
+#   * `pnpm package` (electron-builder). Windows-only, needs a signing setup,
+#     and belongs in a release workflow rather than a per-push gate.
+#
+# Runner choice: ubuntu-latest. The desktop app ships on Windows, but every
+# command above is platform-independent, and Windows runners bill at 2x Linux.
+# The android workflow's own header records a 10x macOS job being reverted on
+# exactly this reasoning.
+
+# PATH-FILTERED, matching the android workflow's allow-list style: a new
+# top-level directory defaults to NOT triggering a desktop build and has to be
+# added here deliberately.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'packages/core/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+      - 'vite.config.ts'
+      - 'vitest.config.ts'
+      - 'eslint.config.mjs'
+      - '.github/workflows/desktop-tests.yml'
+      # Markdown in those trees is documentation and cannot break a build.
+      - '!**/*.md'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'packages/core/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+      - 'vite.config.ts'
+      - 'vitest.config.ts'
+      - 'eslint.config.mjs'
+      - '.github/workflows/desktop-tests.yml'
+      - '!**/*.md'
+
+concurrency:
+  group: desktop-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck + lint + tests + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        # Version comes from the `packageManager` field in package.json, which
+        # is pinned precisely so the version cannot drift between a developer's
+        # machine and CI. pnpm 10 changed where `overrides` and build-script
+        # permissions live; being on a different major here would reintroduce
+        # the install failure this workflow exists to catch.
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # package.json declares engines.node >= 22, and .npmrc sets
+          # engine-strict=true, so anything older fails the install outright.
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        # --frozen-lockfile is already the default via .npmrc; passing it
+        # explicitly documents that a lockfile drift should FAIL CI rather than
+        # silently resolve to something new.
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests
+        # Goes through scripts/run-tests.js, which rebuilds better-sqlite3 for
+        # the Node ABI, runs vitest, and restores the Electron build afterwards.
+        # Running vitest directly would skip the rebuild and fail to load the
+        # native module.
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

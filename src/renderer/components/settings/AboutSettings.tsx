@@ -204,7 +204,7 @@ function UpdateStatusLine({ state }: { state: UpdateState }) {
   if (state.kind === 'idle' || state.kind === 'busy') return null;
   if (state.kind === 'up-to-date') {
     return (
-      <span className="text-xs text-emerald-300">You're on the latest version.</span>
+      <span className="text-xs text-emerald-300">You&apos;re on the latest version.</span>
     );
   }
   if (state.kind === 'update-available') {

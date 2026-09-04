@@ -54,7 +54,11 @@ export function PinModal({ title = 'Enter PIN', contentId, onResult }: PinModalP
     } finally {
       setChecking(false);
     }
-  }, [pin, onResult]);
+    // `contentId` is load-bearing here, not incidental: it decides WHICH item a
+    // correct PIN unlocks. Left out of the deps, the callback would keep the id
+    // from the render that created it, so a prompt that switched targets while
+    // open would unlock the previous item and leave the one on screen locked.
+  }, [pin, onResult, contentId]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
