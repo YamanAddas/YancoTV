@@ -77,6 +77,8 @@
     <string name="cd_categories">التصنيفات</string>
     <string name="cd_favorites">المفضلة</string>
     <string name="cd_all">الكل</string>
+    <string name="cd_collapse">طي التصنيفات</string>
+    <string name="cd_expand">توسيع التصنيفات</string>
     <string name="section_placeholder">%1$s — قادم في مرحلة لاحقة.</string>
     <string name="home_eyebrow_for_you">لك</string>
     <string name="home_continue_title">متابعة المشاهدة</string>

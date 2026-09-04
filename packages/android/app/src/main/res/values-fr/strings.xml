@@ -77,6 +77,8 @@
     <string name="cd_categories">Catégories</string>
     <string name="cd_favorites">Favoris</string>
     <string name="cd_all">Tout</string>
+    <string name="cd_collapse">Réduire les catégories</string>
+    <string name="cd_expand">Développer les catégories</string>
     <string name="section_placeholder">%1$s — arrive dans une prochaine version.</string>
     <string name="home_eyebrow_for_you">POUR VOUS</string>
     <string name="home_continue_title">Reprendre la lecture</string>

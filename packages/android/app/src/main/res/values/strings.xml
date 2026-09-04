@@ -89,6 +89,8 @@
     <string name="cd_categories">Categories</string>
     <string name="cd_favorites">Favorites</string>
     <string name="cd_all">All</string>
+    <string name="cd_collapse">Collapse categories</string>
+    <string name="cd_expand">Expand categories</string>
     <string name="section_placeholder">%1$s — coming in a later milestone.</string>
     <string name="home_eyebrow_for_you">FOR YOU</string>
     <string name="home_continue_title">Continue watching</string>

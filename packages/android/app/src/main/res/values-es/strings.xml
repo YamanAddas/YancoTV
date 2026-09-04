@@ -77,6 +77,8 @@
     <string name="cd_categories">Categorías</string>
     <string name="cd_favorites">Favoritos</string>
     <string name="cd_all">Todo</string>
+    <string name="cd_collapse">Contraer categorías</string>
+    <string name="cd_expand">Expandir categorías</string>
     <string name="section_placeholder">%1$s — llegará en una versión posterior.</string>
     <string name="home_eyebrow_for_you">PARA TI</string>
     <string name="home_continue_title">Continuar viendo</string>

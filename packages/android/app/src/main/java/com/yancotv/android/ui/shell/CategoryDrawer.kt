@@ -2,6 +2,11 @@ package com.yancotv.android.ui.shell
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.DraggableState
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -53,6 +58,37 @@ import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoType
 import kotlin.math.abs
 
+/**
+ * Tap **and** vertical drag on one node.
+ *
+ * Two hand-rolled `pointerInput` detectors do not work here, in either
+ * arrangement. Side by side, `detectTapGestures` consumes the first down and
+ * the `detectVerticalDragGestures` beside it never starts — the node taps and
+ * is inert to dragging. Launched as two coroutines in one `pointerInput`, they
+ * contend for the single `awaitPointerEventScope` and *neither* fires.
+ *
+ * `draggable` and `clickable` are built to coexist: `draggable` claims the
+ * gesture once it passes touch slop and `clickable` takes what is left. That is
+ * what makes the drawer closable — before it, the header toggled on tap and
+ * nothing would pull the drawer shut, because the grid under the finger takes
+ * every other gesture as a scroll.
+ */
+private fun Modifier.tapOrDrag(
+    dragState: DraggableState,
+    onTap: () -> Unit,
+    onDragStopped: () -> Unit,
+): Modifier = this
+    .draggable(
+        state = dragState,
+        orientation = Orientation.Vertical,
+        onDragStopped = { onDragStopped() },
+    )
+    .clickable(
+        interactionSource = null,
+        indication = null,
+        onClick = onTap,
+    )
+
 /** One category row: the provider's name and how many titles are in it. */
 data class CategoryEntry(val name: String, val count: Int)
 
@@ -96,6 +132,9 @@ fun CategoryDrawer(
     val palette = LocalYancoPalette.current
     val metrics = LocalShellMetrics.current
     val density = LocalDensity.current
+    // Resolved here: `semantics {}` is not composable scope.
+    val collapseLabel = stringResource(R.string.cd_collapse)
+    val expandLabel = stringResource(R.string.cd_expand)
 
     val detents = remember(metrics.windowHeight) { Detents(metrics.windowHeight) }
     var restHeight by remember(detents) { mutableStateOf(detents.collapsed) }
@@ -103,6 +142,7 @@ fun CategoryDrawer(
     // the settle can animate while the drag itself does not — a spring on the
     // finger-tracking half adds lag to every pull.
     var dragPx by remember { mutableFloatStateOf(0f) }
+    val dragState = rememberDraggableState { delta -> dragPx += delta }
 
     val settled by animateDpAsState(restHeight, spring(dampingRatio = 0.88f), label = "drawerHeight")
     val height =
@@ -156,13 +196,11 @@ fun CategoryDrawer(
             modifier =
             Modifier
                 .fillMaxWidth()
-                .pointerInput(Unit) { detectTapGestures { toggle() } }
-                .pointerInput(Unit) {
-                    detectVerticalDragGestures(
-                        onDragEnd = { endDrag() },
-                        onDragCancel = { dragPx = 0f },
-                    ) { _, delta -> dragPx += delta }
-                }
+                .tapOrDrag(
+                    dragState = dragState,
+                    onTap = { toggle() },
+                    onDragStopped = { endDrag() },
+                )
                 .padding(horizontal = metrics.pageInset, vertical = Space.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -192,7 +230,7 @@ fun CategoryDrawer(
             )
         }
 
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             // ── open: a grid ──
             if (openRatio > 0f) {
                 LazyVerticalGrid(
@@ -248,51 +286,55 @@ fun CategoryDrawer(
                 }
             }
         }
-    }
 
-    // ── the grabber, on the bottom border ──
-    //
-    // The one control that works in both directions from either state,
+        // ── the grabber ──
+        //
+        // The one control that works in both directions from either state,
     // including closing — with the gesture on the header alone there is
-    // nothing to pull *up* once the grid has the rest of the screen.
+    // nothing to pull *up* once the grid has taken the rest of the drawer.
+    //
+    // **It is a real row inside the drawer, not an overlay on the border.**
+    // The first version drew it inside a `Modifier.height(1.dp)` strip so it
+    // could sit on the hairline. It rendered correctly and was completely
+    // dead: Compose clips touch to the parent's bounds, so a 46x18 target in a
+    // 1 dp-tall parent receives nothing. Dragging the drawer shut was
+    // impossible, because the header is the only other handle and the grid
+    // under the finger takes the gesture as a scroll.
     Box(
-        modifier = Modifier.fillMaxWidth().height(1.dp).background(palette.BorderSubtle),
+        modifier =
+        Modifier
+            .fillMaxWidth()
+            .height(GrabberRow)
+            .tapOrDrag(
+                    dragState = dragState,
+                    onTap = { toggle() },
+                    onDragStopped = { endDrag() },
+                )
+            .semantics {
+                contentDescription = if (isOpen) collapseLabel else expandLabel
+            },
         contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier =
             Modifier
-                // A generous invisible target around the drawn one: 46x18 on a
-                // border is not something a thumb finds reliably.
-                .padding(horizontal = Space.xl, vertical = Space.sm)
-                .pointerInput(Unit) { detectTapGestures { toggle() } }
-                .pointerInput(Unit) {
-                    detectVerticalDragGestures(
-                        onDragEnd = { endDrag() },
-                        onDragCancel = { dragPx = 0f },
-                    ) { _, delta -> dragPx += delta }
-                }
-                .semantics {
-                    contentDescription = if (isOpen) "Collapse categories" else "Expand categories"
-                },
+                .width(46.dp)
+                .height(18.dp)
+                .background(palette.BackgroundRaised, RoundedCornerShape(5.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier =
-                Modifier
-                    .width(46.dp)
-                    .height(18.dp)
-                    .background(palette.BackgroundRaised, RoundedCornerShape(5.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    repeat(2) {
-                        Box(Modifier.width(22.dp).height(1.5.dp).background(palette.TextMuted, RoundedCornerShape(1.dp)))
-                    }
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                repeat(2) {
+                    Box(Modifier.width(22.dp).height(1.5.dp).background(palette.TextMuted, RoundedCornerShape(1.dp)))
+                }
                 }
             }
         }
     }
+
+    // The hairline the drawer sits on. Drawn after it, so the grabber keeps its
+    // own hit area rather than sharing one with a 1 dp line.
+    Box(Modifier.fillMaxWidth().height(1.dp).background(palette.BorderSubtle))
 }
 
 /**
@@ -440,3 +482,6 @@ private class Detents(windowHeight: Dp) {
 }
 
 private val StripHeight = 56.dp
+
+/** Tall enough that a thumb finds it on a border. */
+private val GrabberRow = 26.dp
