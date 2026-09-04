@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import log from 'electron-log/main';
 import { getDb, dropFtsTriggers, restoreFtsTriggers, rebuildFtsIndex } from './db';
 import { classifyEntry } from './content-classifier';
+import { isPlaylistDivider } from '@yancotv/core';
 import { cleanTitle, extractSeasonEpisode, extractShowName } from './title-cleaner';
 import type { ContentItem, ContentType, Episode, SortOption } from '../../shared/types';
 import type { M3uEntry } from './m3u-parser';
@@ -101,9 +102,16 @@ function yieldToEventLoop(): Promise<void> {
 
 export async function storeM3uEntries(
   sourceId: string,
-  entries: M3uEntry[],
+  allEntries: M3uEntry[],
   onProgress?: ProgressCallback,
 ): Promise<number> {
+  // MB-413 — drop the provider's section-heading rows before they become
+  // channels. A flat playlist has no notion of a section, so providers fake
+  // one with a row named `##### SPORTS #####` that carries a stream URL like
+  // any other. Measured on the owner's catalogue: 1,005 of 252,517. Filtered
+  // at WRITE time, matching the sibling apps, so the junk never reaches the
+  // database, search index, favourites or the player.
+  const entries = allEntries.filter((e) => !isPlaylistDivider(e.title));
   const db = getDb();
   const now = Date.now();
 
@@ -282,6 +290,12 @@ export async function storeXtreamContent(
   seriesList: { series: XtreamSeriesInfo[]; categories: Map<string, string> },
   onProgress?: ProgressCallback,
 ): Promise<number> {
+  // MB-413 — drop the provider's section-heading rows before they become
+  // channels (see storeM3uEntries for the measurement and reasoning).
+  liveStreams = {
+    ...liveStreams,
+    streams: liveStreams.streams.filter((x) => !isPlaylistDivider(x.name)),
+  };
   const db = getDb();
   const now = Date.now();
 
@@ -771,6 +785,12 @@ export async function storeStalkerContent(
   seriesList: { series: StalkerSeriesItem[]; categories: Map<string, string> },
   onProgress?: ProgressCallback,
 ): Promise<number> {
+  // MB-413 — drop the provider's section-heading rows before they become
+  // channels (see storeM3uEntries for the measurement and reasoning).
+  liveChannels = {
+    ...liveChannels,
+    channels: liveChannels.channels.filter((c) => !isPlaylistDivider(c.name)),
+  };
   const db = getDb();
   const now = Date.now();
 

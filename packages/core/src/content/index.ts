@@ -1,5 +1,6 @@
 export { cleanTitle, extractYear, extractSeasonEpisode, extractShowName } from './title-cleaner.js';
 export { classifyEntry, normalizeCategory } from './classifier.js';
+export { isPlaylistDivider } from './playlist-dividers.js';
 export {
   parseGroupName,
   parseAllGroups,
