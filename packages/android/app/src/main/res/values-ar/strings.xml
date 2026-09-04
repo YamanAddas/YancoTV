@@ -183,7 +183,7 @@
     <string name="app_sec_type">الخطوط</string>
     <string name="app_sec_type_sub">يُطبَّق فوراً عبر تجاوز LocalDensity — النص المقاس بـ sp يتغير حجمه بدون إعادة تشغيل، وتبقى تخطيطات dp كما هي.</string>
     <string name="app_font_scale">حجم الخط</string>
-    <string name="app_font_scale_hint" formatted="false">يضاعف حجم النص الأساسي. 100% هو الافتراضي.</string>
+    <string name="app_font_scale_hint" formatted="false">يضاعف حجم النص الأساسي. ١٠٠٪ هو الافتراضي.</string>
     <string name="app_kicker_active">مُفعَّل</string>
 
     <!-- MK.31.5 batch D — EPG + Groups tab bodies. -->
@@ -394,7 +394,7 @@
     <string name="bk_encrypt_on">ستُعاد تشفير بيانات دخول المصادر بكلمة مرورك (PBKDF2 + AES/GCM). ستحتاج هذه الكلمة للاستعادة.</string>
     <string name="bk_encrypt_off">ستكون بيانات دخول المصادر بنص عادي في الملف. لا تشارك هذا الملف أو ترفعه.</string>
     <string name="bk_password">كلمة المرور</string>
-    <string name="bk_password_hint">8 أحرف أو أكثر</string>
+    <string name="bk_password_hint">٨ أحرف أو أكثر</string>
     <string name="bk_reset_default">إعادة التعيين للافتراضي</string>
     <string name="bk_change_folder">تغيير المجلد…</string>
     <string name="bk_pick_folder">اختيار مجلد…</string>
@@ -455,7 +455,7 @@
     <string name="sih_connect_timeout">أقصى عدد ثوان لانتظار اتصال TCP</string>
     <string name="sih_read_timeout">أقصى عدد ثوان بين البايتات أثناء التشغيل</string>
     <string name="sih_paired_tv">التحويل عبر الشبكة المحلية — إرسال التشغيل إلى YancoTV آخر</string>
-    <string name="sih_pairing_code">رمز إقران من 6 أرقام لنقطة التحويل عبر الشبكة المحلية</string>
+    <string name="sih_pairing_code">رمز إقران من ٦ أرقام لنقطة التحويل عبر الشبكة المحلية</string>
     <string name="sih_pinned">إعادة ترتيب فئات المزوّد وتثبيتها</string>
     <string name="sih_hide_group">إخفاء فئة من فئات المزوّد عن الأشرطة</string>
     <string name="sih_override_epg">استخدام عنوان XMLTV مخصص بدلاً من عنوان المزوّد</string>
@@ -879,7 +879,7 @@
     <string name="par_change_pin">تغيير رمز PIN</string>
     <string name="par_remove_pin">إزالة رمز PIN</string>
     <string name="par_pin_saved">تم حفظ رمز PIN</string>
-    <string name="par_pin_len_err">يجب أن يكون رمز PIN من 4 إلى 8 أرقام.</string>
+    <string name="par_pin_len_err">يجب أن يكون رمز PIN من ٤ إلى ٨ أرقام.</string>
     <string name="par_pin_mismatch">رمزا PIN غير متطابقين.</string>
     <string name="par_gate_change_title">أدخل رمز PIN الحالي</string>
     <string name="par_gate_remove_title">أكّد بالرمز الحالي</string>
@@ -908,7 +908,7 @@
     <string name="nw_probe_failed">فشل · %1$s</string>
     <string name="ph_later_milestone">مرحلة لاحقة</string>
     <string name="ph_notifications_title">الإشعارات</string>
-    <string name="ph_notifications_body">مفاتيح لكل حدث: تنبيهات دليل البرامج، واكتمال مزامنة المصادر، وجاهزية التسجيل، ومطالبات التحديث. تمرّ عبر WorkManager — وتُصبح متاحة بعد أن تُضيف MK.14 مُنتج أحداث DVR.</string>
+    <string name="ph_notifications_body">مفاتيح لكل حدث: تنبيهات دليل البرامج، واكتمال مزامنة المصادر، وجاهزية التسجيل، ومطالبات التحديث. غير مفعّلة بعد.</string>
     <string name="ph_storage_body">حجم ذاكرة الصور، وحجم ذاكرة دليل البرامج، ومساحة قاعدة بيانات SQLite، وإجراءات مسح بنقرة واحدة. في انتظار مُجمِّع أحجام في طبقة الذاكرة المشتركة ليكون القياس رخيصاً بما يكفي للتحديث عند فتح التبويب.</string>
     <string name="ph_subtitles_title">الترجمات</string>
     <string name="ph_subtitles_body">لغة الترجمة الافتراضية، وحجم الخط، ولونه، وشفافية الخلفية، والموضع الرأسي. يمكنك بالفعل تعديل الترجمة للفيديو الحالي من المشغل — أما الإعدادات الافتراضية الدائمة فستكون هنا.</string>
@@ -1370,4 +1370,10 @@
     <string name="ab_ffmpeg_sources">مصادر مكوّن FFmpeg</string>
     <string name="ab_ffmpeg_sources_hint">شفرة المصدر وتعليمات البناء لمكوّنات FFmpeg.</string>
     <string name="ab_apache_hint">يفتح رخصة Apache 2.0.</string>
+
+    <!-- MK.38.5 - unit abbreviations. These were Kotlin string
+         literals passed as `unit = " s"`, so every language showed the
+         English letter next to its own digits. -->
+    <string name="unit_seconds_short">ث</string>
+    <string name="unit_days_short">ي</string>
 </resources>

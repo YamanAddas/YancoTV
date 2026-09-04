@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
+import com.yancotv.android.locale.localeNumber
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.ui.components.ConfirmDangerDialog
 import com.yancotv.android.ui.focus.placedFocus
@@ -216,7 +217,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             SettingsRowSpacer()
             SettingsRow(
                 label = stringResource(R.string.sd_live_channels),
-                right = { ValueText("${current.channelCount}") },
+                right = { ValueText(localeNumber(current.channelCount)) },
                 readOnlyFocusable = true,
             )
             // MK.30.3 — account expiry. Only rendered when the provider

@@ -908,7 +908,7 @@
     <string name="nw_probe_failed">Error · %1$s</string>
     <string name="ph_later_milestone">Hito posterior</string>
     <string name="ph_notifications_title">Notificaciones</string>
-    <string name="ph_notifications_body">Interruptores por evento: recordatorios de EPG, fin de sincronización de fuentes, avisos de grabación lista y peticiones de actualización. Pasa por WorkManager: se desbloquea cuando MK.14 añada el productor de eventos de DVR.</string>
+    <string name="ph_notifications_body">Interruptores por evento: recordatorios de EPG, fin de sincronización de fuentes, avisos de grabación lista y peticiones de actualización. Todavía no está activado.</string>
     <string name="ph_storage_body">Tamaño de la caché de imágenes, de la caché de EPG, huella de la base SQLite y acciones de borrado con un toque. Pendiente de un agregador de tamaños en la capa de caché compartida para que la lectura sea lo bastante ligera al abrir la pestaña.</string>
     <string name="ph_subtitles_title">Subtítulos</string>
     <string name="ph_subtitles_body">Idioma de subtítulos predeterminado, tamaño del texto, color, opacidad del fondo y posición vertical. Ya puedes ajustar los subtítulos del vídeo actual desde el reproductor — los ajustes predeterminados que persisten entre reinicios estarán aquí.</string>
@@ -1277,4 +1277,10 @@
     <string name="ab_ffmpeg_sources">Fuentes del componente FFmpeg</string>
     <string name="ab_ffmpeg_sources_hint">Código fuente e instrucciones de compilación de los componentes FFmpeg.</string>
     <string name="ab_apache_hint">Abre la licencia Apache 2.0.</string>
+
+    <!-- MK.38.5 - unit abbreviations. These were Kotlin string
+         literals passed as `unit = " s"`, so every language showed the
+         English letter next to its own digits. -->
+    <string name="unit_seconds_short">s</string>
+    <string name="unit_days_short">d</string>
 </resources>

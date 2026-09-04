@@ -58,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.R
+import com.yancotv.android.locale.LocaleController
+import com.yancotv.android.player.DockTimeFormatter
 import com.yancotv.android.sources.syncDetailText
 import com.yancotv.android.ui.components.HexSurface
 import com.yancotv.android.ui.components.ProgressStripe
@@ -85,6 +87,7 @@ import com.yancotv.shared.types.EpgProgramme
 import com.yancotv.shared.types.HistoryEntry
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
@@ -1583,8 +1586,13 @@ private fun matchesPreferredLanguage(item: ContentItem): Boolean {
 
 private fun secondaryLine(ctx: android.content.Context, item: ContentItem, resume: HistoryEntry?): String = when {
     resume != null && resume.durationSeconds != null -> {
-        val watched = formatMmSs(resume.positionSeconds.roundToInt())
-        val total = formatMmSs(resume.durationSeconds!!.roundToInt())
+        // MK.38.5 - this used to call a local copy of the dock's clock
+        // formatter that passed Locale.ROOT, so the Home card read
+        // "9:56 / 9:56" directly beneath "بقي ١ د". One formatter now, and it
+        // takes the language the rest of the screen was resolved in.
+        val locale = LocaleController.localeFor(ctx)
+        val watched = DockTimeFormatter.formatClock(resume.positionSeconds.roundToLong() * 1_000L, locale)
+        val total = DockTimeFormatter.formatClock(resume.durationSeconds!!.roundToLong() * 1_000L, locale)
         ctx.getString(R.string.hc_watched_of_total, watched, total)
     }
     !item.groupName.isNullOrBlank() -> item.groupName!!
@@ -1598,19 +1606,6 @@ private fun secondaryLine(ctx: android.content.Context, item: ContentItem, resum
                 ContentType.SERIES -> R.string.type_series
             },
         )
-}
-
-private fun formatMmSs(sec: Int): String {
-    val s = sec.coerceAtLeast(0)
-    val m = s / 60
-    val r = s % 60
-    return if (m >= 60) {
-        val h = m / 60
-        val mm = m % 60
-        String.format(Locale.ROOT, "%d:%02d:%02d", h, mm, r)
-    } else {
-        String.format(Locale.ROOT, "%d:%02d", m, r)
-    }
 }
 
 private fun formatClock(unixSeconds: Long): String {

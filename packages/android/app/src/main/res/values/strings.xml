@@ -939,7 +939,7 @@
     <string name="nw_probe_failed">Failed · %1$s</string>
     <string name="ph_later_milestone">Later milestone</string>
     <string name="ph_notifications_title">Notifications</string>
-    <string name="ph_notifications_body">Per-event toggles for EPG reminders, source-sync completion, recording-ready alerts, and update prompts. Routes through WorkManager — unblocked once MK.14 adds the DVR event producer.</string>
+    <string name="ph_notifications_body">Per-event toggles for EPG reminders, source-sync completion, recording-ready alerts, and update prompts. Not switched on yet.</string>
     <string name="ph_storage_body">Image cache size, EPG cache size, SQLite DB footprint, and one-tap clear actions. Waiting on a size-aggregator in the shared cache layer so the read is cheap enough to refresh on tab entry.</string>
     <string name="ph_subtitles_title">Subtitles</string>
     <string name="ph_subtitles_body">Default caption language, text size, color, background opacity and vertical position. You can already adjust subtitles for the current video from the player — the defaults that persist across restarts will live here.</string>
@@ -1330,4 +1330,10 @@
     <string name="ab_ffmpeg_sources">FFmpeg component sources</string>
     <string name="ab_ffmpeg_sources_hint">Source code and build instructions for the FFmpeg components, including relinking material.</string>
     <string name="ab_apache_hint">Opens the Apache License 2.0.</string>
+
+    <!-- MK.38.5 - unit abbreviations. These were Kotlin string
+         literals passed as `unit = " s"`, so every language showed the
+         English letter next to its own digits. -->
+    <string name="unit_seconds_short">s</string>
+    <string name="unit_days_short">d</string>
 </resources>

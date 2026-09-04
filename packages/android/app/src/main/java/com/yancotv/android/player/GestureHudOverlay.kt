@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
+import com.yancotv.android.locale.localeNumber
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -120,9 +121,15 @@ private fun LevelBadge(state: GestureHud.Level) {
 private fun SeekBadge(state: GestureHud.Seek) {
     val seconds = abs(state.offsetMs) / 1000L
     val sign = if (state.offsetMs >= 0) "+" else "-"
+    // MK.38.5 - both halves went to the screen untranslated: the digits came
+    // from a string template (always Western) and the "s" was an English
+    // letter in Kotlin source. An Arabic viewer read "+10s" beside a clock
+    // reading "٨:٠٣".
+    val digits = localeNumber(seconds)
+    val unit = stringResource(R.string.unit_seconds_short)
     HudSurface {
         Text(
-            text = "$sign${seconds}s",
+            text = sign + digits + unit,
             color = Color.White,
             fontSize = 30.sp,
             fontWeight = FontWeight.SemiBold,

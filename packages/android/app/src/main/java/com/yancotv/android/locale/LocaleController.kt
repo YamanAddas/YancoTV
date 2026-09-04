@@ -104,6 +104,19 @@ object LocaleController {
     }
 
     /**
+     * The locale the UI is actually in, for code that does not hold an Activity.
+     *
+     * [wrap] only wraps Activities, and `AppCompatDelegate.setApplicationLocales`
+     * reaches the *Application* Context's Configuration only on API 33+. So a
+     * service or worker holding `androidContext()` reads the DEVICE language on
+     * API 28 — the Fire TV — while every screen shows the chosen one. The stored
+     * choice is the same value [wrap] uses, so asking it directly is right on
+     * every API level; the Configuration is the fallback for "follow system",
+     * which is the one case where the platform's resolution is the answer.
+     */
+    fun localeFor(context: Context): Locale = read(context).locale ?: context.resources.configuration.locales[0]
+
+    /**
      * Whether [language] should render right-to-left. Kept here rather than
      * read off the live Configuration so callers can ask before a recreate.
      */

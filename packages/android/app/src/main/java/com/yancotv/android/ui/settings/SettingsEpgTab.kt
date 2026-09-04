@@ -325,7 +325,7 @@ fun SettingsEpgTab(
                     SettingsSlider(
                         value = epgState.daysBack,
                         range = 0..14,
-                        unit = " d",
+                        unit = stringResource(R.string.unit_days_short),
                         presets = listOf(0, 1, 3, 7),
                         onValueChange = { v -> scope.launch { prefs.setEpgDaysBack(v) } },
                     )
@@ -339,7 +339,7 @@ fun SettingsEpgTab(
                     SettingsSlider(
                         value = epgState.daysForward,
                         range = 1..14,
-                        unit = " d",
+                        unit = stringResource(R.string.unit_days_short),
                         presets = listOf(1, 3, 7, 14),
                         onValueChange = { v -> scope.launch { prefs.setEpgDaysForward(v) } },
                     )

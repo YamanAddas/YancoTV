@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
+import com.yancotv.android.locale.localePercent
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.AppearancePrefs
 import com.yancotv.android.ui.focus.snapToTopNearStart
@@ -128,7 +129,7 @@ fun SettingsAppearanceTab(modifier: Modifier = Modifier, themeController: ThemeC
                 content = {
                     SettingsChipRow(
                         options = AppearancePrefs.FONT_SCALE_PRESETS.map { "$it%" },
-                        selected = "${appearance.fontScalePercent}%",
+                        selected = localePercent(appearance.fontScalePercent),
                         onSelect = { selection ->
                             val pct = selection.removeSuffix("%").toIntOrNull() ?: return@SettingsChipRow
                             scope.launch { prefs.setFontScalePercent(pct) }

@@ -72,7 +72,7 @@ object DockTimeFormatter {
      * three metres where every glyph costs. Hours appear only when there are
      * hours.
      */
-    fun formatClock(ms: Long): String {
+    fun formatClock(ms: Long, locale: java.util.Locale = java.util.Locale.getDefault()): String {
         val totalSec = (ms / 1_000L).coerceAtLeast(0L)
         val h = totalSec / 3_600L
         val m = (totalSec % 3_600L) / 60L
@@ -83,9 +83,9 @@ object DockTimeFormatter {
         // MB-268's filename case, where Locale.US was correct precisely because
         // the output was machine-facing.
         return if (h > 0L) {
-            String.format(java.util.Locale.getDefault(), "%d:%02d:%02d", h, m, s)
+            String.format(locale, "%d:%02d:%02d", h, m, s)
         } else {
-            String.format(java.util.Locale.getDefault(), "%d:%02d", m, s)
+            String.format(locale, "%d:%02d", m, s)
         }
     }
 

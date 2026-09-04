@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.locale.localeNumber
 import com.yancotv.android.ui.focus.endwardKey
 import com.yancotv.android.ui.focus.isStartward
 import com.yancotv.android.ui.focus.startwardKey
@@ -355,6 +356,15 @@ internal fun SettingsSlider(
     val shape = RoundedCornerShape(2.dp)
 
     val clampedValue = value.coerceIn(range.first, range.last)
+
+    // MK.38.5 - the readout is a QUANTITY, so its digits follow the UI
+    // language. `unit` is now a translated abbreviation the caller resolves
+    // from resources; it used to be an English letter written in Kotlin
+    // (`unit = " s"`), which no locale could ever change. Both the readout and
+    // the preset chips build from these two, so they cannot drift apart.
+    val unitSuffix = if (unit.isBlank()) "" else " " + unit.trim()
+    val valueLabel = localeNumber(clampedValue) + unitSuffix
+
     val progress =
         if (range.last == range.first) {
             0f
@@ -439,7 +449,7 @@ internal fun SettingsSlider(
                     // key/touch paths above are invisible to accessibility
                     // services).
                     .semantics {
-                        contentDescription = "$clampedValue$unit"
+                        contentDescription = valueLabel
                         progressBarRangeInfo =
                             ProgressBarRangeInfo(
                                 current = clampedValue.toFloat(),
@@ -508,7 +518,7 @@ internal fun SettingsSlider(
                 )
             }
             Text(
-                text = "$clampedValue$unit",
+                text = valueLabel,
                 color = palette.Accent,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
@@ -538,7 +548,7 @@ internal fun SettingsSlider(
             ) {
                 presets.forEach { preset ->
                     SettingsChip(
-                        label = "$preset$unit",
+                        label = localeNumber(preset) + unitSuffix,
                         selected = preset == clampedValue,
                         onClick = { onValueChange(preset.coerceIn(range.first, range.last)) },
                     )

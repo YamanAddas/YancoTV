@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
+import com.yancotv.android.locale.localeNumber
 import com.yancotv.android.ui.theme.LocalReduceMotion
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoIcons
@@ -761,10 +762,7 @@ private fun VodDockTransportRow(
     // every string on this screen; the process default is a separate value that
     // happens to agree most of the time, and "most of the time" is how a
     // localisation bug survives a test.
-    val locales = LocalConfiguration.current.locales
-    val skipDigits = remember(locales) {
-        dockSkipLabelDigits(SeekAccelerator.BASE_STEP_SEC, locales[0])
-    }
+    val skipDigits = localeNumber(SeekAccelerator.BASE_STEP_SEC)
     val skipBackLabel = "-" + skipDigits
     val skipForwardLabel = "+" + skipDigits
     // MK.34.9 — pinned LTR with the ribbon above it. -10 / +10 / next are

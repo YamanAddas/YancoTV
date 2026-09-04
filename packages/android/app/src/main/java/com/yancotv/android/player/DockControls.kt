@@ -1,8 +1,5 @@
 package com.yancotv.android.player
 
-import java.text.NumberFormat
-import java.util.Locale
-
 /**
  * MK.34.10 — the dock's control order, as data rather than as composition order.
  *
@@ -192,17 +189,3 @@ internal fun fitDockControls(order: List<DockControl>, widthsDp: Map<DockControl
 
     return DockFit(shown = shown, overflow = order.filter { it in dropped })
 }
-
-/**
- * MK.38.4 — the digits on the -10 / +10 controls, in [locale]'s numbering.
- *
- * Extracted from the composable so it can be tested: Arabic renders these as
- * Arabic-Indic (`١٠`), and the dock previously drew a hardcoded ASCII `10`
- * beside a clock the app was already localising to `٨:٠٣` — two number systems
- * on one row.
- *
- * [seconds] is `SeekAccelerator.BASE_STEP_SEC` at the call site rather than a
- * literal, because the label's job is to state what the button does. A literal
- * is only correct until someone changes the step.
- */
-internal fun dockSkipLabelDigits(seconds: Int, locale: Locale): String = NumberFormat.getIntegerInstance(locale).format(seconds.toLong())

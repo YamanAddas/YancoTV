@@ -111,7 +111,7 @@ fun SettingsNetworkTab(
                     SettingsSlider(
                         value = state.connectTimeoutSec,
                         range = 1..120,
-                        unit = " s",
+                        unit = stringResource(R.string.unit_seconds_short),
                         presets = listOf(5, 15, 30, 60),
                         onValueChange = { sec ->
                             scope.launch { prefs.setConnectTimeout(sec) }
@@ -127,7 +127,7 @@ fun SettingsNetworkTab(
                     SettingsSlider(
                         value = state.readTimeoutSec,
                         range = 1..600,
-                        unit = " s",
+                        unit = stringResource(R.string.unit_seconds_short),
                         presets = listOf(10, 30, 60, 180),
                         onValueChange = { sec ->
                             scope.launch { prefs.setReadTimeout(sec) }

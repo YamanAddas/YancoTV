@@ -3,6 +3,8 @@ package com.yancotv.android.sync
 import android.content.Context
 import android.util.Xml
 import com.yancotv.android.R
+import com.yancotv.android.locale.LocaleController
+import com.yancotv.android.locale.Numerals
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.epg.BulkEpgWriter
 import com.yancotv.shared.epg.EpgRepository
@@ -133,7 +135,7 @@ class AndroidEpgImporter(
             try {
                 // ───── Phase 1: downloads (NO transaction held) ─────
                 for ((idx, target) in targets.withIndex()) {
-                    val label = "${idx + 1}/${targets.size} (${target.sourceKey})"
+                    val label = progressLabel(idx + 1, targets.size, target.sourceKey)
                     onProgress.report(context.getString(R.string.epg_downloading, label))
                     val tempFile = File(context.cacheDir, "epg-${UUID.randomUUID()}.bin")
                     try {
@@ -221,7 +223,7 @@ class AndroidEpgImporter(
         return try {
             session.begin()
             for ((idx, df) in downloaded.withIndex()) {
-                val label = "${idx + 1}/${downloaded.size} (${df.target.sourceKey})"
+                val label = progressLabel(idx + 1, downloaded.size, df.target.sourceKey)
                 onProgress.report(context.getString(R.string.epg_parsing, label))
                 val parseStart = System.currentTimeMillis()
                 val beforeRows = session.rowsWritten
@@ -604,5 +606,17 @@ class AndroidEpgImporter(
         // (see constructor's `sharedHttp` + `http` field). Eliminates the
         // duplicate connection pool / dispatcher / DNS / TLS that the old
         // private static `HTTP` field carried.
+    }
+
+    /**
+     * MK.38.5 - "1/3 (source)" for a progress line. The two numbers are
+     * quantities, so they follow the UI language; the source key is an
+     * identifier and is left exactly as stored.
+     */
+    private fun progressLabel(index: Int, total: Int, sourceKey: String): String {
+        val locale = LocaleController.localeFor(context)
+        return Numerals.format(index.toLong(), locale) +
+            "/" + Numerals.format(total.toLong(), locale) +
+            " (" + sourceKey + ")"
     }
 }
