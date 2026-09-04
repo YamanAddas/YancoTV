@@ -64,6 +64,56 @@ Three flows. ~60 seconds total on Fire TV. If any one is silent or lands on the 
 2. **Categories → Content (RIGHT or CENTER)** — with a non-All pill focused (e.g. "Sports"), press RIGHT or CENTER. Focus must move into the coverflow AND the selected group must commit (coverflow shows the filtered set, not All). (Bug shape: focus moves but coverflow still shows All; or focus stays on pill and only group commits.)
 3. **Live → Movies type swap** — from Movies sidebar item, after the previous flows had you in Live's coverflow, press D-pad CENTER on Movies. The categories rail must remount with focus landing on **Movies' "All" pill** — never a stale node from Live. (Bug shape: pill rail visually opens but no pill is focused; or focus is on a phantom Live pill.)
 
+## Layout direction (RTL)
+
+The app ships Arabic, so half of these rules are load-bearing on every screen
+with something laid out horizontally.
+
+**Compose mirrors the RENDER for free and mirrors NOTHING about input.** `Row`,
+`Alignment.*Start` / `*End`, `Modifier.offset` (not `absoluteOffset`) and
+`fillMaxWidth(fraction)` inside a default-aligned `Box` all flip under RTL
+without anyone deciding they should. `PointerEvent.position.x` and
+`KEYCODE_DPAD_LEFT` / `RIGHT` never do — they are physical, always. So a
+component gets a mirrored picture and unmirrored decisions, and disagrees with
+itself only in Arabic, where nobody is looking.
+
+**This has now happened twice**, in the same shape, a milestone apart:
+
+- **MK.31.2** — `SettingsSlider`: fill drawn from `Alignment.CenterStart` (which
+  mirrors), key and touch input physical. Pressing "left" raised the value while
+  the fill shrank rightward.
+- **MB-416** — `SectionFlowBar`: `Row` and indicator mirrored, tap and drag
+  divided a raw `position.x`. Every tab activated its mirror — `المزيد` at the
+  left end opened Home, `الرئيسية` at the right opened the More sheet. LTR was
+  never affected, which is why it shipped.
+
+### The rule
+
+Decide, per component, and write the decision in the file:
+
+1. **Interactive, and bound to a timeline** — pin it LTR
+   (`CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr)`)
+   and keep the keys physical. A media scrubber does not mirror in any
+   mainstream player, and LEFT = rewind is muscle memory independent of reading
+   direction. `VodDockProgressRow` does this (MK.34.9) and says why.
+2. **Interactive, and not a timeline** — mirror the render (the default) and
+   make the input logical to match: `flowBarSlotAt` / `flowBarDragTarget` for
+   pointer x, `startwardKey()` / `endwardKey()` for D-pad.
+3. **Passive indicator** (resume progress on a card, a programme's elapsed bar,
+   a download) — let it mirror. That is what the platform's own `ProgressBar`
+   does under RTL, and there is no input to disagree with it.
+
+Half-mirrored is worse than either choice: the viewer presses one way and
+watches the thing move the other.
+
+### Checking it
+
+`Modifier.offset` and `fillMaxWidth(fraction)` were both confirmed
+direction-aware by measurement on a device, not by reading the docs — drag the
+flow bar in Arabic and the indicator lands under the slot you dragged to. When
+in doubt, set the phone to Arabic and look; the dump's `bounds` tell you which
+way the render went, and a tap tells you which way the input went.
+
 ## Accessibility
 
 - **Every user-visible `AsyncImage` needs `contentDescription`** (or explicit `= null` with a paired text label). TalkBack / TV reader announces nothing otherwise.
