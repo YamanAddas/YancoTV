@@ -227,6 +227,43 @@ MK.26 Track B is a Chromecast sender. For Tier 0–eligible streams (H.264 + AAC
 
 ---
 
+### Accepted 2026-09-04 — `webworkify-webpack` is fetched from GitHub with no integrity hash
+
+`pnpm-lock.yaml` records this package with a `tarball:` resolution pointing at
+`codeload.github.com` and **no `integrity` field**, so every cold install pulls
+unverified bytes:
+
+```
+resolution: {tarball: https://codeload.github.com/xqq/webworkify-webpack/tar.gz/24d1e719b4a6…}
+```
+
+It is not a direct dependency. It arrives under `mpegts.js`, the library that
+plays MPEG-TS streams on the HTML5 player backend — which `player-utils.ts`
+selects for `.ts`, `.flv` and every extensionless IPTV URL, i.e. most live
+streams when mpv is not in use. So it is load-bearing, not incidental.
+
+**Why this is accepted rather than fixed.**
+
+- The pin is a **commit SHA**, not a branch or tag, so the content cannot change
+  under us without the URL changing. A tag could be re-pointed; a SHA cannot.
+- The repository is the mpegts.js author's own fork, and the pinned SHA is still
+  that fork's HEAD — verified with `git ls-remote`, so nothing has been
+  rewritten or force-pushed since the lockfile was written.
+- The alternative is replacing `mpegts.js`, which is the HTML5 backend's
+  live-stream decoder. That is a large change to the most failure-prone path in
+  the app, to remove a theoretical risk on a desktop application the user
+  installs deliberately.
+
+**What would change this.** If `git ls-remote` stops returning that SHA, or the
+repository disappears, the install breaks loudly rather than silently — which is
+the acceptable failure mode. A silent one would be the tarball URL resolving to
+different bytes, which the SHA pin prevents.
+
+**Practical consequence to remember:** a cold `pnpm install` needs
+codeload.github.com reachable. Behind a proxy or firewall that blocks it, the
+install fails on this package and the error names the tarball rather than the
+real cause.
+
 ## How to use this file in a rescan
 
 1. Run the audit (`yancoxplorer audit .`).

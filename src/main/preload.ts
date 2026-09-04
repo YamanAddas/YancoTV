@@ -81,18 +81,6 @@ const api = {
     },
   },
 
-  timeshift: {
-    activate: () => ipcRenderer.invoke(IpcChannels.TIMESHIFT_ACTIVATE),
-    deactivate: () => ipcRenderer.invoke(IpcChannels.TIMESHIFT_DEACTIVATE),
-    getState: () => ipcRenderer.invoke(IpcChannels.TIMESHIFT_GET_STATE),
-    onStateChange: (callback: (state: unknown) => void) => {
-      const handler = (_event: IpcRendererEvent, state: unknown) => callback(state);
-      ipcRenderer.on(IpcChannels.TIMESHIFT_STATE, handler);
-      return () => {
-        ipcRenderer.removeListener(IpcChannels.TIMESHIFT_STATE, handler);
-      };
-    },
-  },
 
   catchup: {
     getUrl: (tvgId: string, programmeStart: number, programmeDuration: number) =>

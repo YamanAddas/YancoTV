@@ -92,11 +92,14 @@ export const IpcChannels = {
   CATCHUP_GET_URL: 'catchup:getUrl',
   CATCHUP_CHECK_SUPPORT: 'catchup:checkSupport',
 
-  // Timeshift
-  TIMESHIFT_ACTIVATE: 'timeshift:activate',
-  TIMESHIFT_DEACTIVATE: 'timeshift:deactivate',
-  TIMESHIFT_GET_STATE: 'timeshift:getState',
-  TIMESHIFT_STATE: 'timeshift:state', // main → renderer event
+  // (Removed 2026-09-04.) The four `timeshift:*` channels drove a service that
+  // only tracked "how far behind live the viewer is" and broadcast it. No
+  // renderer file ever consumed it — git history shows it was never wired, not
+  // that it regressed. Live rewind itself is unaffected: it comes from mpv's
+  // own back-buffer (`--demuxer-max-back-bytes`, applied whenever
+  // `player:play` resolves the item as `type === 'live'`), never from this
+  // service. Restore from git history if a "3:42 behind live" indicator is
+  // ever built.
 
   // General app settings (key-value store)
   SETTINGS_GET_ALL: 'settings:getAll',

@@ -74,6 +74,41 @@ notes are the scar tissue. Desktop releases are unrelated (see CHANGELOG.md).
    Settings → check for update → it must offer the new one, install it, and
    come back with data intact (release-signed over release-signed).
 
+## Update manifest (the "Check for updates" button)
+
+Settings -> About fetches a small JSON file and compares its `version` to the
+running build. Until 2026-09-04 the URL was empty, so that button replied "not
+configured" to every user on every click — it could never have worked.
+
+**Where it lives.** The same releases repo as Android, but a different folder:
+
+| Platform | URL | Why there |
+|---|---|---|
+| Windows | `https://yamanaddas.github.io/yancotv-releases/windows/update.json` | New, so it starts in its own folder |
+| Android | `https://yamanaddas.github.io/yancotv-releases/update.json` (root) | **Must not move.** The endpoint is compiled into each APK (`BuildConfig.UPDATE_ENDPOINT`), so every installed Android app polls the root. Relocating it would silently stop updates for everyone already on the app |
+
+If the Android file is ever tidied into `android/update.json`, the root copy has
+to stay until every shipped version that reads it has aged out.
+
+**The two files are different shapes on purpose.** Desktop reads
+`{ version, url, notes }`; Android reads
+`{ versionCode, versionName, downloadUrl, sha256, releaseNotes }`. Two updaters
+written years apart for different install mechanisms — one schema would fit
+neither.
+
+**To publish a desktop release:** copy
+[docs/release/windows-update-manifest.json](docs/release/windows-update-manifest.json)
+into the releases repo at `windows/update.json`, set `version` to the new
+`package.json` version, and point `url` at the installer asset. Verify it is
+live before announcing:
+
+```bash
+curl -s https://yamanaddas.github.io/yancotv-releases/windows/update.json
+```
+
+A 404 there is indistinguishable from a network failure in the UI — both surface
+as an error — so check the URL rather than trusting the button.
+
 ## After
 
 - Tag the source repo (`git tag v<ver>-<code>` on the release commit) so the

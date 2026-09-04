@@ -60,11 +60,6 @@ import {
 } from '../services/epg-service';
 import { getCatchupUrl, checkCatchupSupport } from '../services/catchup-service';
 import {
-  activateTimeshift,
-  deactivateTimeshift,
-  getTimeshiftState,
-} from '../services/timeshift-service';
-import {
   getAllSettings,
   getSetting,
   setSetting,
@@ -913,20 +908,8 @@ export function registerIpcHandlers(): void {
     return checkCatchupSupport(tvgId);
   });
 
-  // Timeshift
-  ipcMain.handle(IpcChannels.TIMESHIFT_ACTIVATE, () => {
-    activateTimeshift();
-    return { ok: true };
-  });
 
-  ipcMain.handle(IpcChannels.TIMESHIFT_DEACTIVATE, () => {
-    deactivateTimeshift();
-    return { ok: true };
-  });
 
-  ipcMain.handle(IpcChannels.TIMESHIFT_GET_STATE, () => {
-    return getTimeshiftState();
-  });
 
   // App settings
   ipcMain.handle(IpcChannels.SETTINGS_GET_ALL, () => {

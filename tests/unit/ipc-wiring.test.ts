@@ -102,10 +102,15 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.PARENTAL_GET_OVERRIDES).toBe('parental:getOverrides');
   });
 
-  it('exports exactly 147 channels', () => {
-    // Bumped from 147 when the mini-player redesign added
-    // PLAYER_SET_PRESENTATION, PLAYER_SET_VIDEO_BOUNDS, and
-    // PLAYER_MODE_BROADCAST for cross-window sync.
-    expect(Object.keys(IpcChannels)).toHaveLength(147);
+  it('exports exactly 143 channels', () => {
+    // The count is a deliberate speed bump: adding or removing a channel is a
+    // change to the surface the renderer can reach, so it should not pass
+    // review unnoticed.
+    //
+    // 151 -> 147 (MB-407): the four `window:*` channels went with the custom
+    //   titlebar that was never mounted.
+    // 147 -> 143 (MB-411): the four `timeshift:*` channels went with a service
+    //   no renderer file ever called.
+    expect(Object.keys(IpcChannels)).toHaveLength(143);
   });
 });
