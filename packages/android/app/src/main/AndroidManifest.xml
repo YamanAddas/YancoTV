@@ -148,6 +148,25 @@
              exported_activity rule fires on every such declaration as a
              review tripwire; the privilege boundary is intentional. -->
         <!-- nosemgrep: java.android.security.exported_activity.exported_activity -->
+        <!-- MK.37.A — rotation unlocked. MB-354 recorded portrait as
+                 "explicitly cancelled" on the grounds that the shell is
+                 landscape-first and a TV app gains nothing from rotating; the
+                 first half was true and is what MK.37 is now fixing, and the
+                 second half is unaffected either way because a television never
+                 reports a rotation. `fullUser` rather than `fullSensor` so the
+                 viewer's own rotation lock is still honoured.
+
+                 `configChanges` carries the orientation set so a rotation does
+                 NOT recreate the activity. That is not an optimisation: state
+                 restoration is uneven across the shell — `HomeContent` has zero
+                 `rememberSaveable` against twelve plain `remember`,
+                 `ContentDetailScreen` none against six — so a recreating
+                 rotation would drop scroll positions, the selected category and
+                 open detail state. Compose recomposes off `LocalConfiguration`
+                 anyway, and `PlayerActivity` has handled its own config changes
+                 this way since MK.11. `uiMode` and locale are deliberately NOT
+                 in the list: those SHOULD recreate, and MB-256's launch-intent
+                 replay guard depends on it. -->
         <activity
             android:name=".MainActivity"
             android:banner="@drawable/tv_banner"
@@ -157,7 +176,8 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:windowSoftInputMode="stateHidden|adjustResize"
-            android:screenOrientation="sensorLandscape"
+            android:screenOrientation="fullUser"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:theme="@style/Theme.YancoTV.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

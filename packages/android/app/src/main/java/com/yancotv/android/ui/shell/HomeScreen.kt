@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,7 +46,9 @@ import com.yancotv.android.ui.detail.ContentDetailScreen
 import com.yancotv.android.ui.nav.AppSection
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.settings.SettingsScreen
+import com.yancotv.android.ui.theme.LocalShellMetrics
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.android.ui.theme.rememberShellMetrics
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.parental.ParentalRepository
@@ -365,6 +368,12 @@ fun HomeScreen(
         }
     }
 
+    // MK.37.A — the shell measures its window once, here, and publishes the
+    // result. Nothing reads it yet: this slice adds the layer and the rotation
+    // unlock and changes no rendering, so the television is byte-for-byte what
+    // it was. Screens adopt `LocalShellMetrics` one at a time from MK.37.B,
+    // each with its own TV pass.
+    CompositionLocalProvider(LocalShellMetrics provides rememberShellMetrics()) {
     Box(modifier = Modifier.fillMaxSize()) {
         CinematicBackground(modifier = Modifier.fillMaxSize())
         // MK.28.1 — the background above stays full-bleed under the
@@ -807,6 +816,7 @@ fun HomeScreen(
                 onDismiss = { section = AppSection.LiveTv },
             )
         }
+    }
     }
 }
 

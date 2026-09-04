@@ -3176,6 +3176,80 @@ catalogue at first launch after upgrade (a full scan computing `TRIM` twice per 
 ~6,900), and the search-plan improvement measured on Android hardware rather than inferred from
 the fork's numbers. Both are device checks, not code changes.
 
+## MK.37 — portrait, and the form-factor layer under it — started 2026-09-03
+
+**Why now.** MB-354 recorded portrait as "explicitly cancelled" (owner decision, 2026-08-22) on two
+grounds: the shell is laid out landscape-first throughout, and a TV app gains nothing from rotating.
+The second is still true and is unaffected by any of this — a television never reports a rotation.
+The first was true and is what this milestone removes. The owner reversed the decision on
+2026-09-03 after seeing the iOS port handle portrait properly.
+
+**What the iOS port actually solved**, and what is worth taking:
+
+1. **Measure the lane, do not switch on a device class.** Sizes are clamped proportions of the
+   width left after the rail, not a `compact ? a : b` pair. An iPhone SE and a 17 Pro Max are both
+   "compact" and were getting byte-identical tiles across 110 pt of width.
+2. **Composition follows the shape of the lane, not the device.** Wide-and-short gets the
+   television layout; a tall lane gets a grid. This is why it also fixed *iPad portrait*, which had
+   the same voids as the phone.
+3. **Navigation chooses on the scarce axis.** A rail whenever height is constrained, a bottom bar
+   only when the window is both narrow and tall.
+4. **Each tall screen gets a different composition, not a squeezed one** — wheel becomes a grid,
+   guide grid becomes a now/next list, the 240 dp category panel becomes a pull-down drawer.
+5. **The plist has to allow rotation at all** — iOS had written the landscape layout and could never
+   reach it.
+
+### MK.37.A — the measurement layer and the rotation unlock — shipped 2026-09-03
+
+`ui/theme/ShellMetrics.kt` plus `LocalShellMetrics`, measured once at the shell root in
+`HomeScreen`. **Nothing reads it yet, deliberately.** The alternative is one commit that changes
+every surface at once on the one form factor that is already shipping; screens adopt it one at a
+time from 37.B, each with its own TV pass.
+
+**One improvement over the port it comes from.** iOS spells the sidebar/panel/grid rule out three
+times — `RootShell`, `CoverflowScreen`, `GuideScreen` — with a comment in each asking the reader to
+keep them in step. Here the decisions are properties of the metrics object (`usesSidebar`,
+`usesCoverflow`), so two screens cannot disagree about the shape of the window they are in.
+
+**A rule that does NOT port as written.** iOS needs `verticalSizeClass == .compact` in the sidebar
+test because UIKit reports an iPhone in landscape as *compact* width whatever its real size, so a
+width-only rule fails on every phone. Android reports real dp: a mainstream phone in landscape is
+~869 dp and passes the width test on its own. The short-viewport clause is still needed, but only
+for the *small* phone — 568x320, narrow **and** short, where a width-only rule would spend ~140 dp
+of a 320 dp-tall window on chrome. `ShellMetricsTest` pins both cases; the first draft of that test
+asserted the iOS behaviour and failed, which is how the difference was found.
+
+**Rotation.** `MainActivity` moves from `sensorLandscape` to `fullUser` — the viewer's own rotation
+lock is still honoured. `configChanges` now carries the orientation set so a rotation does **not**
+recreate the activity. That is not an optimisation: state restoration is uneven across the shell —
+`HomeContent` has zero `rememberSaveable` against twelve plain `remember`, `ContentDetailScreen`
+none against six — so a recreating rotation would drop scroll positions, the selected category and
+open detail state. `uiMode` and locale are deliberately excluded: those *should* recreate, and
+MB-256's launch-intent replay guard depends on it. `PlayerActivity` stays `sensorLandscape` —
+portrait playback is its own slice.
+
+Verified: `ShellMetricsTest` (13 cases), full `:app:` and `:shared:` suites, `:app:lintDebug`, all
+green. Installed release on the Chromecast: renders, no crash, and the sidebar geometry is
+unchanged — every item still 104 px tall in a 120 px rail. (The y-offsets differ between the two
+dumps because the rail's scroll position differs between launches: Home was clipped at the top
+before, Settings at the bottom after. Heights and widths are identical, which is the part that
+would move if the layer had leaked into rendering.)
+
+**Not verified: portrait itself.** No phone was reachable this session, and the Chromecast cannot
+rotate. The layer is unit-tested at phone and tablet viewports, but nothing has been *looked at* in
+portrait on real hardware. That is the first thing 37.B should do.
+
+### Remaining slices
+
+| Slice | Scope |
+|---|---|
+| **37.B** | Shell navigation: `usesSidebar` drives rail vs bottom bar; port the travelling-hexagon `SectionFlowBar`. **Start by putting 37.A on a phone and looking at it.** |
+| **37.C** | Browse portrait: grid composition + a pull-down category drawer (855 categories do not fit a strip). The dead `CategoryChipBar` is either the seed for this or should be deleted. |
+| **37.D** | Home + detail: hero and rails off the measured lane; detail one-column when the lane is tall. |
+| **37.E** | Guide portrait: now/next list instead of the timeline grid. |
+| **37.F** | Portrait player. Separate and deferred — `PlayerActivity` stays landscape until the shell is settled. |
+| **37.G** | Device pass: phone portrait + landscape, Fire TV and Google TV byte-compare. |
+
 ## Timeline
 
 **Removed by user decision 2026-04-25.** Work proceeds at user's pace — sessions resume when user is rested. The 5-stage roadmap at the top of this file replaces week-based estimates. Historical estimates from before 2026-04-25 are preserved in git history if a back-reference is ever needed.
