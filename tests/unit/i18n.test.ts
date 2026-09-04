@@ -178,6 +178,8 @@ describe('migrated surfaces stay migrated', () => {
     'src/renderer/components/settings/ParentalSettings.tsx',
     'src/renderer/components/settings/AboutSettings.tsx',
     'src/renderer/components/settings/EpgSettings.tsx',
+    'src/renderer/components/settings/SubtitlesSettings.tsx',
+    'src/renderer/components/settings/PlaybackSettings.tsx',
   ];
 
   // Deliberately narrow: JSX text nodes of two or more capitalised words, which

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
+import { useT } from '../../i18n';
 import {
   PageHeading,
   SectionHeading,
@@ -17,6 +18,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export function PlaybackSettings() {
+  const t = useT();
   const { get, getBool, set, setBool, load, loaded } = useSettingsStore();
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function PlaybackSettings() {
 
   return (
     <div className="space-y-6">
-      <PageHeading title="Playback" subtitle="Video and audio defaults" />
+      <PageHeading title={t('settingsTab.playback')} subtitle={t('playback.desc')} />
 
       <div className="space-y-2">
         <SectionHeading>Audio</SectionHeading>
@@ -37,7 +39,7 @@ export function PlaybackSettings() {
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-surface-200">Default volume</p>
+              <p className="text-sm font-medium text-surface-200">{t('playback.defaultVolume')}</p>
               <p className="mt-0.5 text-xs text-surface-500">
                 Volume level when the app starts ({defaultVolume}%)
               </p>
@@ -56,20 +58,20 @@ export function PlaybackSettings() {
         </div>
 
         <SettingRow
-          label="Preferred audio language"
-          description="Auto-select audio track by language when available"
+          label={t('playback.preferredAudio')}
+          description={t('playback.preferredAudioDesc')}
         >
           <Select
             value={get('playback_audio_lang')}
             onChange={(v) => set('playback_audio_lang', v)}
             options={[
-              { value: 'default', label: 'Default' },
-              { value: 'en', label: 'English' },
-              { value: 'es', label: 'Spanish' },
-              { value: 'fr', label: 'French' },
-              { value: 'de', label: 'German' },
-              { value: 'ar', label: 'Arabic' },
-              { value: 'pt', label: 'Portuguese' },
+              { value: 'default', label: t('value.default') },
+              { value: 'en', label: t('lang.english') },
+              { value: 'es', label: t('lang.spanish') },
+              { value: 'fr', label: t('lang.french') },
+              { value: 'de', label: t('lang.german') },
+              { value: 'ar', label: t('lang.arabic') },
+              { value: 'pt', label: t('lang.portuguese') },
             ]}
           />
         </SettingRow>
@@ -79,39 +81,39 @@ export function PlaybackSettings() {
         <SectionHeading>Video</SectionHeading>
 
         <SettingRow
-          label="Aspect ratio"
-          description="How the video is scaled to fit the player"
+          label={t('playback.aspectRatio')}
+          description={t('playback.aspectRatioDesc')}
         >
           <Select
             value={get('playback_aspect_ratio')}
             onChange={(v) => set('playback_aspect_ratio', v)}
             options={[
-              { value: 'auto', label: 'Auto' },
+              { value: 'auto', label: t('value.auto') },
               { value: '16:9', label: '16:9' },
               { value: '4:3', label: '4:3' },
-              { value: 'fill', label: 'Fill Screen' },
+              { value: 'fill', label: t('value.fillScreen') },
             ]}
           />
         </SettingRow>
 
         <SettingRow
-          label="Deinterlacing"
-          description="Deinterlace mode for interlaced content"
+          label={t('playback.deinterlacing')}
+          description={t('playback.deinterlacingDesc')}
         >
           <Select
             value={get('playback_deinterlace')}
             onChange={(v) => set('playback_deinterlace', v)}
             options={[
-              { value: 'auto', label: 'Auto' },
-              { value: 'on', label: 'Always On' },
-              { value: 'off', label: 'Off' },
+              { value: 'auto', label: t('value.auto') },
+              { value: 'on', label: t('value.alwaysOn') },
+              { value: 'off', label: t('value.off') },
             ]}
           />
         </SettingRow>
 
         <SettingRow
-          label="Default playback speed"
-          description="Speed for VOD content (does not affect live)"
+          label={t('playback.defaultSpeed')}
+          description={t('playback.defaultSpeedDesc')}
         >
           <Select
             value={get('playback_speed')}
@@ -129,32 +131,32 @@ export function PlaybackSettings() {
       </div>
 
       <div className="space-y-2">
-        <SectionHeading>Buffering</SectionHeading>
+        <SectionHeading>{t('playback.buffering')}</SectionHeading>
 
         <SettingRow
-          label="Buffer size"
-          description="Larger buffers reduce stuttering but increase delay"
+          label={t('playback.bufferSize')}
+          description={t('playback.bufferSizeDesc')}
         >
           <Select
             value={get('playback_buffer_size')}
             onChange={(v) => set('playback_buffer_size', v)}
             options={[
-              { value: 'auto', label: 'Auto' },
-              { value: 'small', label: 'Small (1s)' },
-              { value: 'medium', label: 'Medium (3s)' },
-              { value: 'large', label: 'Large (5s)' },
-              { value: 'xlarge', label: 'Extra Large (10s)' },
+              { value: 'auto', label: t('value.auto') },
+              { value: 'small', label: t('buffer.small') },
+              { value: 'medium', label: t('buffer.medium') },
+              { value: 'large', label: t('buffer.large') },
+              { value: 'xlarge', label: t('buffer.xlarge') },
             ]}
           />
         </SettingRow>
       </div>
 
       <div className="space-y-2">
-        <SectionHeading>Behaviour</SectionHeading>
+        <SectionHeading>{t('playback.behaviour')}</SectionHeading>
 
         <SettingRow
-          label="Resume playback"
-          description="Continue VOD content from where you left off"
+          label={t('playback.resume')}
+          description={t('playback.resumeDesc')}
         >
           <Toggle
             checked={getBool('playback_resume')}

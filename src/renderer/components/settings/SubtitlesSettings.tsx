@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
+import { useT } from '../../i18n';
+import type { StringKey } from '../../i18n/locales/en';
 import {
   PageHeading,
   SectionHeading,
@@ -20,29 +22,34 @@ import {
 // `--sub-scale`, `--sub-color`, `--sub-back-color` args (see mpv-args.ts).
 // ---------------------------------------------------------------------------
 
+// Keys, not resolved labels: these arrays are module-level constants evaluated
+// once at import, so a resolved string would freeze whatever language was
+// active at load and never update when the user switches. Resolved at the
+// render site instead, like the sidebar's nav items.
 const LANGUAGE_OPTIONS = [
-  { value: 'off', label: 'Off' },
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Spanish' },
-  { value: 'fr', label: 'French' },
-  { value: 'de', label: 'German' },
-  { value: 'ar', label: 'Arabic' },
-  { value: 'pt', label: 'Portuguese' },
-  { value: 'tr', label: 'Turkish' },
-  { value: 'it', label: 'Italian' },
-  { value: 'nl', label: 'Dutch' },
-  { value: 'ru', label: 'Russian' },
+  { value: 'off', labelKey: 'value.off' as StringKey },
+  { value: 'en', labelKey: 'lang.english' as StringKey },
+  { value: 'es', labelKey: 'lang.spanish' as StringKey },
+  { value: 'fr', labelKey: 'lang.french' as StringKey },
+  { value: 'de', labelKey: 'lang.german' as StringKey },
+  { value: 'ar', labelKey: 'lang.arabic' as StringKey },
+  { value: 'pt', labelKey: 'lang.portuguese' as StringKey },
+  { value: 'tr', labelKey: 'lang.turkish' as StringKey },
+  { value: 'it', labelKey: 'lang.italian' as StringKey },
+  { value: 'nl', labelKey: 'lang.dutch' as StringKey },
+  { value: 'ru', labelKey: 'lang.russian' as StringKey },
 ];
 
 const COLOR_OPTIONS = [
-  { value: '#FFFFFF', label: 'White' },
-  { value: '#FFFF00', label: 'Yellow' },
-  { value: '#FFB400', label: 'Amber' },
-  { value: '#00FFC8', label: 'Cyan' },
-  { value: '#FF64A5', label: 'Pink' },
+  { value: '#FFFFFF', labelKey: 'color.white' as StringKey },
+  { value: '#FFFF00', labelKey: 'color.yellow' as StringKey },
+  { value: '#FFB400', labelKey: 'color.amber' as StringKey },
+  { value: '#00FFC8', labelKey: 'color.cyan' as StringKey },
+  { value: '#FF64A5', labelKey: 'color.pink' as StringKey },
 ];
 
 export function SubtitlesSettings() {
+  const t = useT();
   const { get, getBool, set, setBool, load, loaded } = useSettingsStore();
 
   useEffect(() => {
@@ -58,21 +65,21 @@ export function SubtitlesSettings() {
   return (
     <div className="space-y-6">
       <PageHeading
-        title="Subtitles"
-        subtitle="Default language, auto-search, and on-screen appearance"
+        title={t('settingsTab.subtitles')}
+        subtitle={t('subs.desc')}
       />
 
       <div className="space-y-2">
-        <SectionHeading>Language</SectionHeading>
+        <SectionHeading>{t('settings.language')}</SectionHeading>
 
         <SettingRow
-          label="Preferred subtitle language"
-          description="Auto-select subtitle track when available"
+          label={t('subs.preferredLang')}
+          description={t('subs.preferredLangDesc')}
         >
           <Select
             value={get('playback_subtitle_lang')}
             onChange={(v) => set('playback_subtitle_lang', v)}
-            options={LANGUAGE_OPTIONS}
+            options={LANGUAGE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
           />
         </SettingRow>
       </div>
@@ -81,8 +88,8 @@ export function SubtitlesSettings() {
         <SectionHeading>OpenSubtitles</SectionHeading>
 
         <SettingRow
-          label="Auto-search when playback starts"
-          description="Find and download a matching subtitle as soon as a movie / episode plays"
+          label={t('subs.autoSearch')}
+          description={t('subs.autoSearchDesc')}
         >
           <Toggle
             checked={getBool('opensubtitles.autoSearch')}
@@ -94,12 +101,12 @@ export function SubtitlesSettings() {
       </div>
 
       <div className="space-y-2">
-        <SectionHeading>Appearance</SectionHeading>
+        <SectionHeading>{t('subs.appearance')}</SectionHeading>
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-surface-200">Text size</p>
+              <p className="text-sm font-medium text-surface-200">{t('subs.textSize')}</p>
               <p className="mt-0.5 text-xs text-surface-500">
                 Scale factor applied on top of the source subtitle size
               </p>
@@ -120,22 +127,22 @@ export function SubtitlesSettings() {
         </div>
 
         <SettingRow
-          label="Text color"
-          description="Color of the subtitle font"
+          label={t('subs.textColor')}
+          description={t('subs.textColorDesc')}
         >
           <Select
             value={currentColor}
             onChange={(v) => set('subtitle_color', v)}
-            options={COLOR_OPTIONS}
+            options={COLOR_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
           />
         </SettingRow>
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-surface-200">Background opacity</p>
+              <p className="text-sm font-medium text-surface-200">{t('subs.bgOpacity')}</p>
               <p className="mt-0.5 text-xs text-surface-500">
-                Opacity of the shaded box behind subtitle text
+                {t('subs.bgOpacityDesc')}
               </p>
             </div>
             <span className="text-sm font-medium text-surface-300">{backOpacity}%</span>
@@ -174,6 +181,7 @@ function SubtitlePreview({
   color: string;
   backOpacity: number;
 }) {
+  const t = useT();
   const alpha = Math.max(0, Math.min(1, backOpacity / 100));
   return (
     <div className="flex h-24 items-end justify-center rounded-xl border border-accent/5 bg-gradient-to-br from-surface-800 to-surface-900 p-4">
@@ -187,7 +195,7 @@ function SubtitlePreview({
           fontWeight: 600,
         }}
       >
-        Sample subtitle text
+        {t('subs.sampleText')}
       </span>
     </div>
   );
@@ -198,6 +206,7 @@ function SubtitlePreview({
 // ---------------------------------------------------------------------------
 
 function OpenSubtitlesCredentials() {
+  const t = useT();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<'idle' | 'saving' | 'clearing' | 'saved' | 'error'>('idle');
@@ -246,7 +255,7 @@ function OpenSubtitlesCredentials() {
   return (
     <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
       <div>
-        <p className="text-sm font-medium text-surface-200">OpenSubtitles account</p>
+        <p className="text-sm font-medium text-surface-200">{t('subs.account')}</p>
         <p className="mt-0.5 text-xs text-surface-500">
           Optional — raises your daily download limit. Anonymous users get 5/day.
         </p>
@@ -256,13 +265,13 @@ function OpenSubtitlesCredentials() {
         <TextInput
           value={username}
           onChange={setUsername}
-          placeholder="Username"
+          placeholder={t('auth.username')}
           className="w-full"
         />
         <TextInput
           value={password}
           onChange={setPassword}
-          placeholder="Password"
+          placeholder={t('auth.password')}
           type="password"
           className="w-full"
         />
@@ -279,7 +288,7 @@ function OpenSubtitlesCredentials() {
           <button
             onClick={clearCache}
             className="ml-auto text-xs text-surface-500 hover:text-surface-300 transition-colors"
-            title="Clear subtitle cache"
+            title={t('subs.clearCache')}
           >
             Clear cache ({cacheStats.count})
           </button>
