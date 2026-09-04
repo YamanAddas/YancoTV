@@ -3717,6 +3717,38 @@ fine — `./gradlew` had been invoked from the repo root, where it does not exis
 failed silently and a **stale APK** was installed and measured. A build step that produces no
 `BUILD SUCCESSFUL` line is not a build; grep for it rather than trusting the install that follows.
 
+### MK.37.H.3 — the last settings tab sat 18dp above the section bar — shipped 2026-09-04
+
+Reported as menus in Settings hiding below the fold and not coming up even at the end of a scroll.
+
+Measured rather than assumed, and the first sweep was **wrong in the app's favour**: it tapped tab
+coordinates captured before scrolling, so after the first tab every subsequent tap missed and six
+tabs reported the identical last item at the identical y. A detector that returns "ok" six times
+from one screen is not a pass. Re-locating each tab on a fresh dump before tapping gave six
+genuinely distinct screens, all of which scrolled clear.
+
+So the reported symptom does not reproduce as clipping: all **12** tabs are reachable and every tab
+body scrolls clear of the bar (359–492px). But the margin at the end of the master list was
+**18dp** — `About` bottoming at 2231 against a bar top of 2296 on a Pixel XL. Reachable, and only
+just. That margin is consumed by a larger font scale, a taller nav-bar inset, or one more entry in
+`SettingsTab`, and it is the one place in Settings where the last thing on the list is *nearly*
+under the bar.
+
+The list's symmetric 12dp padding is now 12dp top / 48dp bottom. Padding inside a `verticalScroll`
+adds to the scrollable extent, so this buys travel rather than whitespace: clearance went 65px →
+191px, a gain of 126px against a predicted 36dp × 3.5 = 126px. The arithmetic matching exactly is
+what confirms the mechanism rather than a coincidence of scroll position.
+
+Television is untouched by construction — `SettingsPhoneLayout` is reachable only when
+`smallestScreenWidthDp < COMPACT_SETTINGS_SW_DP && !isTv`.
+
+**Two install traps hit while verifying this, both of which fake a "fix didn't work" result.**
+`installDebug` installs to *every* connected device, so with two TVs on release attached it fails on
+signature mismatch and the phone never gets the build — the failure reads as if the phone rejected
+it. And an `adb install` whose output is not printed is not a confirmed install. The first
+re-measurement here returned byte-identical numbers, which is the signature of measuring the old
+build, not of an ineffective change. Install to one device with `adb -s`, and print the result.
+
 ### Remaining slices
 
 | Slice | Scope |

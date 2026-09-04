@@ -239,7 +239,15 @@ private fun SettingsPhoneLayout(initialTab: SettingsTab, onExit: () -> Unit) {
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                    // MK.37.H.3 — the bottom pad is deliberately larger than
+                    // the top. This list ends directly above the section bar,
+                    // and with symmetric 12dp padding the last row (About)
+                    // cleared it by 18dp on a Pixel XL — reachable, but only
+                    // just, and the margin shrinks with font scale, a taller
+                    // nav-bar inset, or one more tab in the enum. Padding
+                    // inside a verticalScroll adds to the scrollable extent,
+                    // so this buys real travel rather than only whitespace.
+                    .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 48.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 for (entry in visibleTabs) {
