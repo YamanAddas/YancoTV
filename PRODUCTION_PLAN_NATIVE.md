@@ -3006,7 +3006,7 @@ Verified: 828 shared tests (2 new), 0 failures; `:app:testDebugUnitTest`, `:app:
 **Not verified on device.** Home's own rail tile was left alone; it is a separate composable and
 belongs in its own slice.
 
-### MB-401 — the coverflow orb's caption line never reaches the screen — open
+### MB-401 — the coverflow orb's caption line never reaches the screen — FIXED 2026-09-03
 
 Found while verifying MK.36.4 on the Chromecast (1920x1080 @ density 2 = 960x540 dp).
 
@@ -3029,10 +3029,29 @@ condition (`if (sub.isNotBlank())`) and every layout constant are untouched, and
 replaced was equally non-blank. The line has been getting clipped for as long as the fixed height
 and the centre scale have coexisted.
 
-Fix is a layout decision, not a one-liner — raise `OrbHeight`, shrink the art box, drop the centre
-scale, or size the orb from the measured lane the way `ShellMetrics` does on iOS (which is the
-MK.37 portrait work). Deliberately not bundled into MK.36.4: it is a design change to the wheel and
-wants to be looked at on a TV, not inferred from a dump.
+**Cause, established by experiment rather than arithmetic.** The first reading — that the fixed
+200 dp `Column` had no room for a third child — was wrong; the content measures ~187 dp and fits.
+Forcing the caption to a literal `"XCAPX"` with the `isNotBlank` guard removed and reinstalling
+proved the `Text` is emitted and still never appears, which rules out the content and points at the
+container. The wheel band took `weight(0.38f)` of a 1080 p viewport — about 390 px — while the orb
+`Column` is a fixed 200 dp, i.e. 400 px. The band clipped the Column's bottom, and the caption is
+exactly what sits there.
+
+**Fix: 0.62/0.38 becomes 0.58/0.42.** The band is now ~454 px, clearing the 400 px orb with room for
+the 1.18x centre scale. The preview pane could afford the 4%: measured, its content ended at y=528
+of the ~670 px it had. Chosen over shrinking `OrbWidth`, which would have made the artwork smaller
+on every device to work around a container that was simply too short.
+
+Verified on the Chromecast after the change: `2022  ·  ★ 3.5` and `2026  ·  ★ 8.0` now render as
+real text nodes under their orbs, the poster keeps its exact 2:3 ratio (300x450), and preview
+content ends at y=584 with the wheel starting at y=623 — nothing clipped at either end.
+
+`weight` in a `Column` allocates height and both children are `fillMaxWidth()`, so no horizontal
+dimension can change; an apparent difference in where the action buttons wrap between two dumps was
+the sidebar being expanded in one (456 px) and collapsed in the other (120 px).
+
+**Not verified on Fire TV.** 0.42 of a 540 dp viewport is 227 dp against the orb's 200 dp, so the
+arithmetic clears there too, but no Fire TV was reachable this session.
 
 ### What is deliberately NOT switched on, and why each needs real work
 

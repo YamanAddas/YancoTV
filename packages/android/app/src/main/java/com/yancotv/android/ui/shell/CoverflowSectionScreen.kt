@@ -654,14 +654,28 @@ fun CoverflowSectionScreen(
                 modifier =
                 Modifier
                     .fillMaxWidth()
-                    .weight(0.62f),
+                    // MB-401 — 0.62/0.38 left the wheel band ~390 px on a
+                    // 1080 p viewport while `ContentOrb` is a fixed 200 dp
+                    // (400 px) Column, so the Column's bottom was clipped and
+                    // the caption line — the last of its three children —
+                    // never reached the screen on any orb. Verified on the
+                    // Chromecast by forcing the caption to a literal string:
+                    // still absent, so it was the band, not the content.
+                    //
+                    // The preview pane can afford it: measured, its own
+                    // content ended at y=528 of the ~670 px it had, so 4% is
+                    // slack rather than something being given up.
+                    .weight(0.58f),
             )
 
             Box(
                 modifier =
                 Modifier
                     .fillMaxWidth()
-                    .weight(0.38f)
+                    // MB-401 — see the note on the preview pane's weight.
+                    // 0.42 of 1080 p is 454 px, which clears the orb's 400 px
+                    // with room for the 1.18x centre scale to breathe.
+                    .weight(0.42f)
                     // A startward press at the leading orb pops back to the
                     // categories rail. Inter-orb presses flow through to
                     // LazyRow's natural focus traversal — we only intercept
