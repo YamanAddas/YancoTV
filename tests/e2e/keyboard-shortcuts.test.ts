@@ -8,6 +8,7 @@
 import { test, expect } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import path from 'path';
+import { mainWindow } from './helpers/electron-app';
 
 let app: ElectronApplication;
 let page: Page;
@@ -20,7 +21,7 @@ test.beforeAll(async () => {
       NODE_ENV: 'test',
     },
   });
-  page = await app.firstWindow();
+  page = await mainWindow(app);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(1000);
 });

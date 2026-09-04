@@ -80,9 +80,6 @@ export interface PlayerStoreState {
   controlsVisible: boolean;
   /** Used by VideoPlayer (html5 backend) to know the start position */
   _startPosition?: number;
-  /** MB-405 — set while replaying a call the PIN prompt just released, so the
-   *  gate check does not fire again and re-prompt forever. */
-  _unlockRetry?: boolean;
   /** Ephemeral preview of the channel the user is zapping to (PageUp/Down). Null when no zap is in progress. */
   zapTarget: ZapTarget | null;
 }
@@ -94,6 +91,8 @@ interface PlayerStoreActions {
     contentId?: string,
     episodeId?: string,
     contentType?: 'live' | 'movie' | 'series',
+    /** INTERNAL — see the implementation. Only the PIN prompt's resume sets it. */
+    _gateAlreadyPassed?: boolean,
   ) => Promise<void>;
   pause: () => void;
   resume: () => void;
@@ -167,7 +166,6 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   showAspectMenu: false,
   controlsVisible: true,
   _startPosition: undefined,
-  _unlockRetry: false,
   zapTarget: null,
 
   // --- Actions ---
@@ -178,6 +176,16 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     contentId?: string,
     episodeId?: string,
     contentType?: 'live' | 'movie' | 'series',
+    /**
+     * INTERNAL. Set only by the PIN prompt's resume callback, to replay the one
+     * call it just released without re-triggering the gate.
+     *
+     * This was a `_unlockRetry` flag on the store, which was wrong: a flag is
+     * store-wide, so any OTHER play starting during the retry window — a zap
+     * key, a firing reminder — would have skipped its own gate too. Scoped to
+     * the single call, there is no window.
+     */
+    _gateAlreadyPassed?: boolean,
   ) => {
     if (!window.api) return;
     const { backend } = get();
@@ -193,7 +201,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     // The main process is still the authority — it refuses a locked
     // PLAYER_PLAY independently. This call is what turns that refusal into a
     // PIN prompt instead of an error toast.
-    if (!get()._unlockRetry) {
+    if (!_gateAlreadyPassed) {
       try {
         const gate = await window.api.parental.requiresPin(contentId, url);
         if (gate?.required && gate.contentId) {
@@ -201,12 +209,9 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             contentId: gate.contentId,
             title,
             resume: () => {
-              // Re-enter with the same arguments. The flag stops a second gate
-              // check from re-prompting on the replay.
-              set({ _unlockRetry: true });
-              void get()
-                .play(url, title, contentId, episodeId, contentType)
-                .finally(() => set({ _unlockRetry: false }));
+              // Re-enter with the same arguments, telling only THIS call to
+              // skip the gate it has already satisfied.
+              void get().play(url, title, contentId, episodeId, contentType, true);
             },
           });
           return;

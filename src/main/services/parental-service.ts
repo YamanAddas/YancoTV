@@ -201,6 +201,19 @@ export function updateParentalSetting(key: string, value: boolean): void {
 
 const sessionUnlocked = new Set<string>();
 
+/**
+ * Is any channel locked at all?
+ *
+ * Lets the caller skip resolving a content id before it asks. That resolution
+ * is a `stream_url` lookup, and this runs on every play, so on the overwhelmingly
+ * common setup — no PIN, or a PIN with nothing locked — the gate should cost one
+ * cheap query and no catalogue access.
+ */
+export function hasAnyLockedChannel(): boolean {
+  if (!getParentalSettings().pinEnabled) return false;
+  return getLockedChannelIds().length > 0;
+}
+
 /** Grant playback of one locked item for the rest of this process's life. */
 export function unlockForSession(contentId: string): void {
   sessionUnlocked.add(contentId);

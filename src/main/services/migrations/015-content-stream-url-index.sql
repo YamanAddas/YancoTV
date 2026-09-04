@@ -1,0 +1,11 @@
+-- MB-405 — index content.stream_url.
+--
+-- The parental playback gate resolves a content id from the stream URL when the
+-- caller omits the optional `contentId` argument to `player:play`. Without an
+-- index that lookup is a full scan of `content`, which on the owner's catalogue
+-- is ~174k VOD rows plus ~53k live — paid on every play.
+--
+-- The column is not unique: the same stream legitimately appears under several
+-- sources, and `getContentByTypeMerged` dedups on exactly this value. A plain
+-- index is therefore correct; a UNIQUE one would reject real catalogues.
+CREATE INDEX IF NOT EXISTS idx_content_stream_url ON content(stream_url);

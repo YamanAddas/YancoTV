@@ -87,6 +87,7 @@ import {
   removeChannelOverride,
   getAllChannelOverrides,
   requiresPinToPlay,
+  hasAnyLockedChannel,
   unlockForSession,
   applyParentalVisibility,
   applyParentalCategoryVisibility,
@@ -995,7 +996,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IpcChannels.PARENTAL_REQUIRES_PIN,
     (_event, contentId?: string, streamUrl?: string) => {
-      const id = contentId ?? (streamUrl ? getContentIdByStreamUrl(streamUrl) : undefined);
+      const id =
+        contentId ??
+        (streamUrl && hasAnyLockedChannel() ? getContentIdByStreamUrl(streamUrl) : undefined);
       return { required: requiresPinToPlay(id), contentId: id };
     },
   );
@@ -1140,7 +1143,9 @@ export function registerIpcHandlers(): void {
       // gating them individually is what left every path except the Live TV
       // grid unguarded. The id is recovered from the URL when the caller omits
       // it, so a call site that forgets the argument cannot walk past a lock.
-      const gateId = contentId ?? getContentIdByStreamUrl(url);
+      // Resolve from the URL only when a lock could actually apply — that
+      // lookup touches the whole catalogue, and this runs on every play.
+      const gateId = contentId ?? (hasAnyLockedChannel() ? getContentIdByStreamUrl(url) : undefined);
       if (requiresPinToPlay(gateId)) {
         return { ok: false, error: 'parental-locked', contentId: gateId };
       }

@@ -29,11 +29,48 @@ export async function launchApp(): Promise<AppContext> {
     },
   });
 
-  // Wait for the main window to appear
-  const page = await app.firstWindow();
+  const page = await mainWindow(app);
   await page.waitForLoadState('domcontentloaded');
 
   return { app, page };
+}
+
+/**
+ * The window running the YancoTV renderer.
+ *
+ * NOT `app.firstWindow()`. The app opens three: a transparent `data:text/html`
+ * child window that mpv is embedded into, the real renderer, and a controls
+ * overlay. Creation order puts the video stage first, so `firstWindow()` returns
+ * a blank page — `title()` is `""`, no sidebar, no body text — and every
+ * assertion about the UI fails against a window that was never going to contain
+ * any. Seventeen specs were failing on exactly that.
+ *
+ * Identified by URL rather than by index or title: the renderer is the only
+ * window loaded from `dist/renderer/index.html` (or, in dev, the Vite server),
+ * whereas title and order are both incidental. Waiting matters too — the
+ * renderer is not necessarily present the instant the app is up.
+ */
+export async function mainWindow(app: ElectronApplication): Promise<Page> {
+  const isRenderer = (p: Page) => {
+    const url = p.url();
+    return url.includes('renderer/index.html') || url.includes('localhost:5173/index.html');
+  };
+
+  const existing = app.windows().find(isRenderer);
+  if (existing) return existing;
+
+  // Not open yet — take windows as they appear until the renderer shows up.
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    const found = app.windows().find(isRenderer);
+    if (found) return found;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+
+  throw new Error(
+    'renderer window never appeared. Windows seen: ' +
+      JSON.stringify(app.windows().map((w) => w.url())),
+  );
 }
 
 /**
