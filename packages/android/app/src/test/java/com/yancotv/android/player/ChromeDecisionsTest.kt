@@ -55,6 +55,42 @@ class ChromeDecisionsTest {
     }
 
     @Test
+    fun `live gets the same dock, minus the next-episode control`() {
+        // MK.38 — the point of the change. Live used to get Media3's default
+        // controller while VOD got this dock; the surface was never actually
+        // VOD-specific, only NEXT was.
+        val live = dockControlOrder(hasNext = true, isLive = true)
+        val vod = dockControlOrder(hasNext = true, isLive = false)
+
+        assertFalse(DockControl.NEXT in live, "a channel has no next episode")
+        assertEquals(
+            vod.filterNot { it == DockControl.NEXT },
+            live,
+            "live must differ from VOD by NEXT alone — anything else moving means " +
+                "the two docks have started to drift apart again",
+        )
+    }
+
+    @Test
+    fun `live keeps the skip controls`() {
+        // Not decoration: the player holds a back-buffer, so rewinding inside it
+        // is real. A stream that refuses the seek leaves the position where it
+        // was rather than breaking, which is why these are enabled rather than
+        // greyed.
+        val live = dockControlOrder(hasNext = true, isLive = true)
+        assertTrue(DockControl.SKIP_BACK in live)
+        assertTrue(DockControl.SKIP_FORWARD in live)
+    }
+
+    @Test
+    fun `hasNext is irrelevant on live`() {
+        assertEquals(
+            dockControlOrder(hasNext = true, isLive = true),
+            dockControlOrder(hasNext = false, isLive = true),
+        )
+    }
+
+    @Test
     fun `PREVIOUS does not exist in any configuration`() {
         // User decision, 2026-08-19. The reference dock has no direction
         // controls, and "remove any stray comma/apostrophe button" described the

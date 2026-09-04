@@ -48,11 +48,19 @@ internal enum class DockControl {
  * device-verified, and the brief separately forbids breaking existing playback
  * actions. That conflict was resolved by the user (2026-08-19): keep ›, drop ‹.
  */
-internal fun dockControlOrder(hasNext: Boolean): List<DockControl> = buildList {
+internal fun dockControlOrder(hasNext: Boolean, isLive: Boolean = false): List<DockControl> = buildList {
     add(DockControl.SKIP_BACK)
     add(DockControl.PLAY_PAUSE)
     add(DockControl.SKIP_FORWARD)
-    if (hasNext) add(DockControl.NEXT)
+    // MK.38 — NEXT is the next EPISODE, which a channel does not have. Every
+    // other control means the same thing on live as it does on a film, which is
+    // why live now gets this dock rather than Media3's default one: the surface
+    // was never VOD-specific, only this one button was.
+    //
+    // -10 / +10 stay. They are not decoration on live: the player keeps a
+    // back-buffer, so rewinding inside it is real, and a provider stream that
+    // refuses the seek leaves the position where it was rather than breaking.
+    if (hasNext && !isLive) add(DockControl.NEXT)
     add(DockControl.DIVIDER)
     add(DockControl.SUBTITLES)
     add(DockControl.AUDIO)
@@ -69,4 +77,5 @@ internal fun dockControlOrder(hasNext: Boolean): List<DockControl> = buildList {
  * assertion must exclude it — otherwise the test would encode a cursor stop
  * that does not exist and would "pass" a dock where RIGHT skipped a control.
  */
-internal fun dockFocusOrder(hasNext: Boolean): List<DockControl> = dockControlOrder(hasNext).filterNot { it == DockControl.DIVIDER }
+internal fun dockFocusOrder(hasNext: Boolean, isLive: Boolean = false): List<DockControl> =
+    dockControlOrder(hasNext, isLive).filterNot { it == DockControl.DIVIDER }

@@ -362,6 +362,20 @@ class PlayerActivity : AppCompatActivity() {
     private var dockFocusMenuOnOpen by mutableStateOf(false)
     private var dockData by mutableStateOf(VodDockData())
     private var dockProgress by mutableStateOf(VodDockProgress())
+
+    /**
+     * MK.38 — live dock state.
+     *
+     * Held beside [dockProgress] rather than derived inside the composition:
+     * the EPG lookup is a suspend call the activity already makes for the zap
+     * bar, and doing it twice would ask the provider's guide the same question
+     * from two places.
+     */
+    private var dockIsLive by mutableStateOf(false)
+    private var dockProgramme by mutableStateOf<DockProgramme?>(null)
+
+    /** Title of the programme after [currentProgramme], for the dock's live row. */
+    private var nextProgrammeTitle: String? = null
     private var dockAutoHideJob: Job? = null
     private var dockProgressTickJob: Job? = null
 
@@ -1189,7 +1203,13 @@ class PlayerActivity : AppCompatActivity() {
         // because the Compose dock replaces it. Re-apply on every item
         // change so a zap from VOD → LIVE or back flips the control surface.
         val isLive = item?.type == ContentType.LIVE
-        playerView.useController = (item == null) || isLive
+        // MK.38 — LIVE no longer keeps Media3's built-in controller. It kept it
+        // because the zap bar and programme row rode alongside it; those now
+        // ride with the dock, so both content kinds present the same surface.
+        // With no item at all there is nothing to dock, so Media3's controller
+        // stays as the fallback.
+        playerView.useController = (item == null)
+        dockIsLive = isLive
         if (item == null) {
             zapBar.visibility = View.GONE
             progressRow.visibility = View.GONE
@@ -1205,7 +1225,8 @@ class PlayerActivity : AppCompatActivity() {
         // zap bar is chromed-in by the controller-visibility listener; we
         // no longer force the controller open on channel change (see the
         // `controllerAutoShow = false` decision above).
-        zapBar.visibility = if (controllerVisible) View.VISIBLE else View.GONE
+        // MK.38 — rides with the dock now, not Media3's controller.
+        zapBar.visibility = if (dockVisible) View.VISIBLE else View.GONE
 
         val tvgId = item.tvgId?.takeIf { it.isNotBlank() }
         if (!isLive || tvgId == null) {
@@ -1225,6 +1246,7 @@ class PlayerActivity : AppCompatActivity() {
             val now = nn?.now
             val next = nn?.next
             currentProgramme = now
+            nextProgrammeTitle = next?.title
             zapNow.text = now?.title?.let { "Now: $it" }.orEmpty()
             zapNow.visibility = if (now != null) View.VISIBLE else View.GONE
             zapNext.text = next?.title?.let { "Next: $it" }.orEmpty()
@@ -1235,11 +1257,14 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun applyOverlayVisibility() {
-        zapBar.visibility = if (controllerVisible && controller.currentId != null) View.VISIBLE else View.GONE
+        zapBar.visibility = if (dockVisible && controller.currentId != null) View.VISIBLE else View.GONE
         val liveWithEpg =
             currentProgramme != null &&
                 controller.currentItem.value?.type == ContentType.LIVE
-        progressRow.visibility = if (controllerVisible && liveWithEpg) View.VISIBLE else View.GONE
+        // MK.38 — superseded by the dock's LiveProgrammeRow, which sits where
+        // the seek ribbon does on a film. Kept in the layout rather than deleted
+        // so this is one reversible commit; it renders nothing now.
+        progressRow.visibility = View.GONE
         updatePlayerChrome()
     }
 
@@ -1255,12 +1280,11 @@ class PlayerActivity : AppCompatActivity() {
             return
         }
         val isLive = controller.currentItem.value?.type == ContentType.LIVE
-        val show =
-            when (controller.currentItem.value?.type) {
-                ContentType.LIVE -> controllerVisible
-                ContentType.MOVIE, ContentType.SERIES -> dockVisible
-                null -> false
-            }
+        // MK.38 — one surface, one visibility. Live used to follow Media3's
+        // controller and VOD the dock, which is why the two had to be kept in
+        // step by hand in five places. Now everything with an item follows the
+        // dock.
+        val show = controller.currentItem.value != null && dockVisible
         val vis = if (show) View.VISIBLE else View.GONE
         backButton.visibility = vis
         topActions.visibility = vis
@@ -1292,12 +1316,9 @@ class PlayerActivity : AppCompatActivity() {
             hideSurf()
             return
         }
-        val isLive = controller.currentItem.value?.type == ContentType.LIVE
-        if (isLive) {
-            if (controllerVisible) playerView.hideController() else playerView.showController()
-        } else {
-            if (dockVisible) hideVodDock() else showVodDock()
-        }
+        // MK.38 — one surface for both kinds. The live branch used to open
+        // Media3's controller here; there is no longer a second thing to open.
+        if (dockVisible) hideVodDock() else showVodDock()
     }
 
     // ───── Program progress ─────
@@ -1317,6 +1338,7 @@ class PlayerActivity : AppCompatActivity() {
         val prog =
             currentProgramme ?: run {
                 progressRow.visibility = View.GONE
+                dockProgramme = null
                 return
             }
         val nowSec = System.currentTimeMillis() / 1000L
@@ -1328,12 +1350,26 @@ class PlayerActivity : AppCompatActivity() {
         ppTitle.text = prog.title
         ppTime.text = getString(R.string.pa_programme_time, remainingMin, totalMin)
         ppBar.progress = pct
+
+        // MK.38 — the same numbers feed the dock's live row. Computed once,
+        // here, rather than again inside the composition: `prog.startTime` and
+        // `endTime` are XMLTV epoch SECONDS, and a second site doing its own
+        // clock arithmetic is how two parts of one screen come to disagree
+        // about how far through a programme you are.
+        dockProgramme =
+            DockProgramme(
+                nowTitle = prog.title,
+                nextTitle = nextProgrammeTitle,
+                progress = (elapsed.toFloat() / total.toFloat()).coerceIn(0f, 1f),
+                remainingLabel = getString(R.string.pa_programme_time, remainingMin, totalMin),
+            )
         if (nowSec >= prog.endTime) {
             // Programme rolled over — clear so next poll or next/next refresh
             // can replace it. Cheap safety; a proper refresh happens on the
             // next channel change or when the user re-opens EPG.
             currentProgramme = null
             progressRow.visibility = View.GONE
+            dockProgramme = null
         }
     }
 
@@ -2573,6 +2609,11 @@ class PlayerActivity : AppCompatActivity() {
                 visibility = if (dockVisible) VodDockVisibility.VISIBLE else VodDockVisibility.HIDDEN,
                 data = dockData,
                 progress = dockProgress,
+                // MK.38 — live gets this same dock. The two differences are the
+                // seek ribbon becoming the programme row and NEXT dropping out;
+                // everything else already meant the same thing on a channel.
+                isLive = dockIsLive,
+                programme = dockProgramme,
                 // MB-343 — NEXT is live whenever a next episode is prefetched,
                 // independent of the queue. Episode playback always has a
                 // one-item queue, which is why this button was dead for the
@@ -2805,6 +2846,7 @@ class PlayerActivity : AppCompatActivity() {
         // and optionsV2 paths already encode (search "FOCUS_BLOCK_DESCENDANTS"
         // for the canonical pattern).
         if (controllerVisible) playerView.hideController()
+        if (dockVisible) hideVodDock()
         playerView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         playerView.isFocusable = false
         // MB-343 — clear the up-next card the instant a surface that suppresses
@@ -2993,6 +3035,7 @@ class PlayerActivity : AppCompatActivity() {
             if (event.repeatCount == 0 &&
                 isCenterKey(event.keyCode) &&
                 !controllerVisible &&
+                !dockVisible &&
                 noOverlay &&
                 !chromeUp &&
                 !channelZapState.visible.value

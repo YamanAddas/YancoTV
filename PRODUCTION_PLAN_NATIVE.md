@@ -3829,6 +3829,64 @@ coordinates; BACK handing focus to the sidebar so DOWN counted sidebar movement)
 results, one real bug — **on a TV the question is not "does the content scroll" but "can focus get
 there"**, and only a D-pad walk answers it.
 
+### MK.38 — live TV gets the same dock as film and episode — code complete, device verification blocked
+
+Reported by the owner: "البلاير تبع لايف تي في عالاندرويد تي في مالو نفس البلاير تبع الأفلام
+والمسلسلات" — the live player is not the same player as the one for films and series.
+
+**What it was.** `PlayerActivity` ran two control surfaces. VOD got `VodPlayerDock`, the Compose
+dock; live got Media3's built-in controller. The code said why:
+
+```kotlin
+// LIVE keeps Media3's built-in controller (needed for the zap bar /
+// program-progress overlays to ride alongside it).
+playerView.useController = (item == null) || isLive
+```
+
+So the split existed to give two XML overlays something to attach to — not because any control
+meant something different on a channel.
+
+**How iOS solved it** (`PlayerScreen.swift`): one dock for both, with three adaptations — a `LivePill`
+badge, the progress ribbon hidden, and ±10 disabled. The owner's note on that: the hiding was
+because the bar could not fit everything, and the intended fix is a **More** button that surfaces
+what does not fit rather than dropping it. iOS will be brought to whatever this lands on.
+
+**What this does.** One dock, both kinds. `dockControlOrder(hasNext, isLive)` drops only `NEXT` —
+the next EPISODE, which a channel does not have. ±10 stay, and deliberately: the player holds a
+back-buffer, so rewinding inside it is real, and a stream that refuses the seek leaves the position
+alone rather than breaking.
+
+Where the seek ribbon sits on a film, live shows `LiveProgrammeRow` — what is on, how far through,
+and what follows. That is **better than hiding it**, which is what iOS does today: the space is the
+right place for the one thing a live viewer wants, and the app already computes it for the old XML
+row. The row keeps its height with no guide data so the dock does not jump when zapping between a
+film and a channel, and it is not focusable — a D-pad stop that cannot do anything costs a press.
+
+`renderProgramProgress()` now feeds both the old XML row and the dock from **one** computation.
+`epg_programmes.start_time` is XMLTV epoch seconds, and a second site doing its own clock arithmetic
+is how two halves of one screen come to disagree about how far through a programme you are.
+
+Five call sites moved from `controllerVisible` to `dockVisible`, and the chrome decision collapsed
+from a `when` over content type to `currentItem != null && dockVisible`. That `when` was the reason
+the two surfaces had to be kept in step by hand.
+
+**Verified:** 506 app + 830 shared tests, 0 failures. Three new tests pin that live differs from VOD
+by `NEXT` alone — anything else moving means the docks have drifted apart again. ktlintCheck green,
+`assembleRelease` builds, installs on the Fire TV, app launches with 0 fatals and the sidebar at its
+usual `[40,160][160,264]`.
+
+**NOT verified, and this is the part that matters.** The dock has not been seen on a live channel on
+a device. Two independent reasons: the **Fire TV has no source configured at all** ("No sources yet"
+in Settings → Sources), and the **phone's debug seed points at a free list whose streams return
+404**, so the player opens into an error state and never reaches a playing item. Adding the owner's
+provider is not something to do on their behalf.
+
+What the device pass still has to answer, none of which a unit test can:
+  - the dock actually appears on CENTER over a live channel, and Media3's controller does not
+  - the zap bar and the OSD still appear, now riding with the dock
+  - D-pad focus lands somewhere sensible, and the cascade smoke test still passes
+  - zapping VOD → live → VOD swaps the surface cleanly
+
 ### Remaining slices
 
 | Slice | Scope |

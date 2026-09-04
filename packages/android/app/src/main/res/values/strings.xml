@@ -1171,6 +1171,7 @@
     <!-- MB-340 dock time + episode kicker -->
     <string name="vd_ends_at">ENDS %1$s</string>
     <string name="vd_up_next">UP NEXT</string>
+    <string name="vd_dock_up_next">Up next: %1$s</string>
     <string name="vd_next_in">NEXT IN %1$s</string>
     <string name="vd_play">Play</string>
     <string name="vd_pause">Pause</string>

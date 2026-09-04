@@ -124,6 +124,28 @@ data class VodDockData(
 data class VodDockProgress(val playedMs: Long = 0L, val bufferedMs: Long = 0L, val durationMs: Long = 0L)
 
 /**
+ * MK.38 — what the dock shows on LIVE in place of the seek ribbon.
+ *
+ * A channel has no timeline to scrub, but it does have a programme, and that
+ * is the thing a viewer actually wants to know: what is on, how far through it
+ * is, and what follows. The space the scrubber occupies on a film is exactly
+ * where that belongs.
+ *
+ * Kept dumb, like [VodDockProgress]: the caller resolves the EPG, clamps the
+ * fraction and formats the label. No clock and no locale logic in here — the
+ * activity already owns both, and duplicating them is how two places come to
+ * disagree about what time it is.
+ */
+data class DockProgramme(
+    val nowTitle: String,
+    val nextTitle: String? = null,
+    /** 0..1, already clamped by the caller. */
+    val progress: Float = 0f,
+    /** Pre-formatted, e.g. "23 min left". Null when the guide gives no end time. */
+    val remainingLabel: String? = null,
+)
+
+/**
  * Top-level dispatcher. Stage-1 skeleton: renders nothing when visibility
  * is HIDDEN; VISIBLE renders an empty full-screen Box that later stages
  * fill in with the metadata / progress / transport / secondary rows.
@@ -133,6 +155,13 @@ fun VodPlayerDock(
     visibility: VodDockVisibility,
     data: VodDockData,
     progress: VodDockProgress,
+    /**
+     * MK.38 — LIVE renders the same dock. The only differences are this flag's
+     * two effects: the seek ribbon becomes [programme], and NEXT drops out of
+     * [dockControlOrder] because a channel has no next episode.
+     */
+    isLive: Boolean = false,
+    programme: DockProgramme? = null,
     onTogglePlayPause: () -> Unit,
     onSkipBack: () -> Unit,
     onSkipForward: () -> Unit,
@@ -207,12 +236,18 @@ fun VodPlayerDock(
                 VodDockMetadata(data = data)
             }
             Spacer(Modifier.height(6.dp))
-            // Level 2 — timeline ribbon.
-            VodDockProgressRow(
-                progress = progress,
-                onSeekTo = onSeekTo,
-                onUserInteraction = onUserInteraction,
-            )
+            // Level 2 — the timeline ribbon, or on live the programme it stands
+            // in for. Live keeps the row rather than collapsing it so the dock
+            // does not change height when zapping between a film and a channel.
+            if (isLive) {
+                LiveProgrammeRow(programme)
+            } else {
+                VodDockProgressRow(
+                    progress = progress,
+                    onSeekTo = onSeekTo,
+                    onUserInteraction = onUserInteraction,
+                )
+            }
             Spacer(Modifier.height(6.dp))
             // Level 3 — the floating dock, centred under the timeline.
             VodDockTransportRow(
@@ -226,6 +261,7 @@ fun VodPlayerDock(
                 onUserInteraction = onUserInteraction,
                 hasNext = hasNext,
                 menuFocus = menuFocus,
+                isLive = isLive,
             )
         }
     }
@@ -383,6 +419,89 @@ private fun TypeBadge(label: String) {
             letterSpacing = 1.2.sp,
             maxLines = 1,
         )
+    }
+}
+
+/**
+ * MK.38 — what stands in for the seek ribbon on a live channel.
+ *
+ * Same height and same horizontal rhythm as [VodDockProgressRow], so the dock
+ * does not jump when zapping between a film and a channel — the row is kept
+ * even with no guide data, rendering an empty track rather than collapsing.
+ *
+ * Not focusable, unlike the VOD ribbon: there is nothing to scrub to. A focus
+ * stop that does nothing costs a D-pad press on the way to the transport row,
+ * which on a remote is a real cost rather than a cosmetic one.
+ */
+@Composable
+private fun LiveProgrammeRow(programme: DockProgramme?) {
+    val glass = glassTokens()
+    val dock = dockMetrics()
+
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = dock.horizontalPadding),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = programme?.nowTitle.orEmpty(),
+                    color = glass.textPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (programme?.remainingLabel != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = programme.remainingLabel,
+                        color = glass.textDim,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            // The track. Painted even with no programme so the row keeps its
+            // height — see the note above about zapping.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(glass.textDim.copy(alpha = 0.35f)),
+            ) {
+                val pct = (programme?.progress ?: 0f).coerceIn(0f, 1f)
+                if (pct > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(pct)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(glass.accent),
+                    )
+                }
+            }
+
+            if (programme?.nextTitle != null) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = stringResource(R.string.vd_dock_up_next, programme.nextTitle),
+                    color = glass.textDim,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
@@ -619,6 +738,7 @@ private fun VodDockTransportRow(
     onUserInteraction: () -> Unit,
     hasNext: Boolean,
     menuFocus: FocusRequester,
+    isLive: Boolean,
 ) {
     val glass = glassTokens()
     val dockShape = RoundedCornerShape(18.dp)
@@ -644,7 +764,7 @@ private fun VodDockTransportRow(
             // reorder during a refactor would have been silent because the dock
             // would still build, still focus and still work. Now the order is
             // data, and the test and the screen read the same object.
-            dockControlOrder(hasNext).forEach { control ->
+            dockControlOrder(hasNext, isLive).forEach { control ->
                 when (control) {
                     DockControl.SKIP_BACK ->
                         HexControl(
