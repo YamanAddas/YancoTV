@@ -110,6 +110,31 @@ internal object PlayerChromeMetrics {
     fun sheetMaxHeightDp(screenHeightDp: Float): Float = screenHeightDp * 0.68f
 
     /**
+     * MK.38.2 — the width of a word-carrying secondary control (`CC`, `AUDIO`).
+     *
+     * Derived from the label rather than fixed, because a regular hexagon's flat
+     * top is only half its width: one shared width either clips `VELOCIDAD` or
+     * leaves `CC` swimming. The text sits at the hexagon's vertical middle where
+     * the silhouette is at full width, so ~5 dp per character plus 60% of the
+     * height for the two slanted ends, floored at the square size so `CC` never
+     * renders narrower than a plain hexagon.
+     *
+     * It lives here, and not inline in `DockSecondary`, because [fitDockControls]
+     * has to know how wide a control will be *before* it is composed. Two copies
+     * of this arithmetic would drift, and the symptom would be a row that
+     * measures as fitting and then does not.
+     */
+    fun dockSecondaryWidthDp(label: String, hexSizeDp: Float): Float = (label.length * 5f + hexSizeDp * 0.6f).coerceAtLeast(hexSizeDp)
+
+    /**
+     * The painted separator: a 1 dp rule with 4 dp of air on each side.
+     * Not a control and not a focus stop — but it does occupy width, and a fit
+     * calculation that forgets it is wrong by exactly one control's worth over
+     * the course of a few of them.
+     */
+    const val DOCK_DIVIDER_WIDTH_DP = 9f
+
+    /**
      * Physical pixels a [dp] value occupies at [density], for tests that want to
      * assert the brief's numbers in the units the brief was written in.
      */

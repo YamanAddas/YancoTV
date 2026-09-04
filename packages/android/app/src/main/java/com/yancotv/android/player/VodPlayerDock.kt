@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -750,119 +751,176 @@ private fun VodDockTransportRow(
     // is directional — cuts this way: their meaning IS directional, and the
     // direction they refer to is the timeline's, not the text's.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Row(
-            modifier = Modifier
-                .glassSurface(dockShape)
-                .padding(horizontal = dock.horizontalPadding, vertical = dock.verticalPadding),
-            horizontalArrangement = Arrangement.spacedBy(dock.gap),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // MK.34.10 — rendered by WALKING dockControlOrder rather than by
-            // listing the controls here. The brief specifies an exact sequence,
-            // and until now the only place that sequence existed was the order
-            // these calls happened to appear in: nothing could assert it, and a
-            // reorder during a refactor would have been silent because the dock
-            // would still build, still focus and still work. Now the order is
-            // data, and the test and the screen read the same object.
-            dockControlOrder(hasNext, isLive).forEach { control ->
-                when (control) {
-                    DockControl.SKIP_BACK ->
-                        HexControl(
-                            variant = HexVariant.TRANSPORT,
-                            contentDescription = stringResource(R.string.vd_rewind_10),
-                            onClick = {
+        // MK.38.2 — the row measures itself. A plain Row silently measures every
+        // child past the edge at zero width, and ours is ordered with the menu
+        // LAST, so a narrow screen deleted the one control that could reach
+        // everything the narrow screen had dropped. See [fitDockControls].
+        BoxWithConstraints {
+            val fit = rememberDockFit(
+                hasNext = hasNext,
+                isLive = isLive,
+                availableDp = (maxWidth - dock.horizontalPadding * 2).value,
+                gapDp = dock.gap.value,
+            )
+            Row(
+                modifier = Modifier
+                    .glassSurface(dockShape)
+                    .padding(horizontal = dock.horizontalPadding, vertical = dock.verticalPadding),
+                horizontalArrangement = Arrangement.spacedBy(dock.gap),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // MK.34.10 — rendered by WALKING dockControlOrder rather than by
+                // listing the controls here. The brief specifies an exact sequence,
+                // and until now the only place that sequence existed was the order
+                // these calls happened to appear in: nothing could assert it, and a
+                // reorder during a refactor would have been silent because the dock
+                // would still build, still focus and still work. Now the order is
+                // data, and the test and the screen read the same object.
+                fit.shown.forEach { control ->
+                    when (control) {
+                        DockControl.SKIP_BACK ->
+                            HexControl(
+                                variant = HexVariant.TRANSPORT,
+                                contentDescription = stringResource(R.string.vd_rewind_10),
+                                onClick = {
+                                    onUserInteraction()
+                                    onSkipBack()
+                                },
+                            ) { tint -> DockLabel("-10", tint, 9.sp) }
+
+                        DockControl.PLAY_PAUSE ->
+                            HexControl(
+                                variant = HexVariant.HERO,
+                                contentDescription = stringResource(if (isPlaying) R.string.vd_pause else R.string.vd_play),
+                                onClick = {
+                                    onUserInteraction()
+                                    onTogglePlayPause()
+                                },
+                                focusRequester = playPauseFocus,
+                            ) { tint -> DockLabel(if (isPlaying) "II" else "\u25B6", tint, 16.sp) }
+
+                        DockControl.SKIP_FORWARD ->
+                            HexControl(
+                                variant = HexVariant.TRANSPORT,
+                                contentDescription = stringResource(R.string.vd_forward_10),
+                                onClick = {
+                                    onUserInteraction()
+                                    onSkipForward()
+                                },
+                            ) { tint -> DockLabel("+10", tint, 9.sp) }
+
+                        DockControl.NEXT ->
+                            HexControl(
+                                variant = HexVariant.TRANSPORT,
+                                contentDescription = stringResource(R.string.vd_next),
+                                onClick = {
+                                    onUserInteraction()
+                                    onNext()
+                                },
+                            ) { tint -> DockLabel("\u203A", tint, 16.sp) }
+
+                        DockControl.DIVIDER -> DockDivider()
+
+                        DockControl.SUBTITLES ->
+                            DockSecondary(stringResource(R.string.vd_cc)) {
                                 onUserInteraction()
-                                onSkipBack()
-                            },
-                        ) { tint -> DockLabel("-10", tint, 9.sp) }
+                                onOpenSheet(SheetMode.SUBS)
+                            }
 
-                    DockControl.PLAY_PAUSE ->
-                        HexControl(
-                            variant = HexVariant.HERO,
-                            contentDescription = stringResource(if (isPlaying) R.string.vd_pause else R.string.vd_play),
-                            onClick = {
+                        DockControl.AUDIO ->
+                            DockSecondary(stringResource(R.string.vd_audio)) {
                                 onUserInteraction()
-                                onTogglePlayPause()
-                            },
-                            focusRequester = playPauseFocus,
-                        ) { tint -> DockLabel(if (isPlaying) "II" else "\u25B6", tint, 16.sp) }
+                                onOpenSheet(SheetMode.AUDIO)
+                            }
 
-                    DockControl.SKIP_FORWARD ->
-                        HexControl(
-                            variant = HexVariant.TRANSPORT,
-                            contentDescription = stringResource(R.string.vd_forward_10),
-                            onClick = {
+                        DockControl.SPEED ->
+                            DockSecondary(stringResource(R.string.vd_speed)) {
                                 onUserInteraction()
-                                onSkipForward()
-                            },
-                        ) { tint -> DockLabel("+10", tint, 9.sp) }
+                                onOpenSheet(SheetMode.SPEED)
+                            }
 
-                    DockControl.NEXT ->
-                        HexControl(
-                            variant = HexVariant.TRANSPORT,
-                            contentDescription = stringResource(R.string.vd_next),
-                            onClick = {
+                        DockControl.ASPECT ->
+                            DockSecondary(stringResource(R.string.vd_fit)) {
                                 onUserInteraction()
-                                onNext()
-                            },
-                        ) { tint -> DockLabel("\u203A", tint, 16.sp) }
+                                onOpenSheet(SheetMode.ASPECT)
+                            }
 
-                    DockControl.DIVIDER -> DockDivider()
+                        DockControl.FAVORITE ->
+                            HexControl(
+                                variant = HexVariant.SECONDARY,
+                                contentDescription = stringResource(R.string.vd_fav),
+                                onClick = {
+                                    onUserInteraction()
+                                    onOpenSheet(SheetMode.FAV)
+                                },
+                            ) { tint ->
+                                Icon(
+                                    imageVector = YancoIcons.Favorites,
+                                    contentDescription = null,
+                                    tint = tint,
+                                    modifier = Modifier.size(hexMetrics(HexVariant.SECONDARY).size * 0.42f),
+                                )
+                            }
 
-                    DockControl.SUBTITLES ->
-                        DockSecondary(stringResource(R.string.vd_cc)) {
-                            onUserInteraction()
-                            onOpenSheet(SheetMode.SUBS)
-                        }
-
-                    DockControl.AUDIO ->
-                        DockSecondary(stringResource(R.string.vd_audio)) {
-                            onUserInteraction()
-                            onOpenSheet(SheetMode.AUDIO)
-                        }
-
-                    DockControl.SPEED ->
-                        DockSecondary(stringResource(R.string.vd_speed)) {
-                            onUserInteraction()
-                            onOpenSheet(SheetMode.SPEED)
-                        }
-
-                    DockControl.ASPECT ->
-                        DockSecondary(stringResource(R.string.vd_fit)) {
-                            onUserInteraction()
-                            onOpenSheet(SheetMode.ASPECT)
-                        }
-
-                    DockControl.FAVORITE ->
-                        HexControl(
-                            variant = HexVariant.SECONDARY,
-                            contentDescription = stringResource(R.string.vd_fav),
-                            onClick = {
-                                onUserInteraction()
-                                onOpenSheet(SheetMode.FAV)
-                            },
-                        ) { tint ->
-                            Icon(
-                                imageVector = YancoIcons.Favorites,
-                                contentDescription = null,
-                                tint = tint,
-                                modifier = Modifier.size(hexMetrics(HexVariant.SECONDARY).size * 0.42f),
-                            )
-                        }
-
-                    DockControl.MENU ->
-                        HexControl(
-                            variant = HexVariant.SECONDARY,
-                            contentDescription = stringResource(R.string.vd_menu),
-                            focusRequester = menuFocus,
-                            onClick = {
-                                onUserInteraction()
-                                onOpenSheet(SheetMode.MENU)
-                            },
-                        ) { tint -> DockLabel("\u2022\u2022\u2022", tint, 11.sp) }
+                        DockControl.MENU ->
+                            HexControl(
+                                variant = HexVariant.SECONDARY,
+                                contentDescription = stringResource(R.string.vd_menu),
+                                focusRequester = menuFocus,
+                                onClick = {
+                                    onUserInteraction()
+                                    onOpenSheet(SheetMode.MENU)
+                                },
+                            ) { tint -> DockLabel("\u2022\u2022\u2022", tint, 11.sp) }
+                    }
                 }
             }
         }
+    }
+}
+
+/**
+ * MK.38.2 — how wide each control will be, resolved before any of them exists.
+ *
+ * Every width here is deterministic from the metrics and the label, which is
+ * the whole reason this can be a calculation rather than a `SubcomposeLayout`:
+ * hexagons are sized by [PlayerChromeMetrics.hexSizeDp] and word controls by
+ * [PlayerChromeMetrics.dockSecondaryWidthDp], and `DockSecondary` calls that
+ * same function, so the measurement and the render cannot disagree.
+ *
+ * The labels are read through `stringResource` on purpose — the fit depends on
+ * the locale. `VELOCIDAD` is four characters longer than `SPEED`, which is the
+ * difference between the row fitting on a phone and not.
+ */
+@Composable
+private fun rememberDockFit(hasNext: Boolean, isLive: Boolean, availableDp: Float, gapDp: Float): DockFit {
+    val order = dockControlOrder(hasNext, isLive)
+    val transport = hexMetrics(HexVariant.TRANSPORT).size.value
+    val hero = hexMetrics(HexVariant.HERO).size.value
+    val secondary = hexMetrics(HexVariant.SECONDARY).size.value
+    val cc = stringResource(R.string.vd_cc)
+    val audio = stringResource(R.string.vd_audio)
+    val speed = stringResource(R.string.vd_speed)
+    val aspect = stringResource(R.string.vd_fit)
+
+    val widths = remember(transport, hero, secondary, cc, audio, speed, aspect) {
+        mapOf(
+            DockControl.SKIP_BACK to transport,
+            DockControl.PLAY_PAUSE to hero,
+            DockControl.SKIP_FORWARD to transport,
+            DockControl.NEXT to transport,
+            DockControl.DIVIDER to PlayerChromeMetrics.DOCK_DIVIDER_WIDTH_DP,
+            DockControl.SUBTITLES to PlayerChromeMetrics.dockSecondaryWidthDp(cc, secondary),
+            DockControl.AUDIO to PlayerChromeMetrics.dockSecondaryWidthDp(audio, secondary),
+            DockControl.SPEED to PlayerChromeMetrics.dockSecondaryWidthDp(speed, secondary),
+            DockControl.ASPECT to PlayerChromeMetrics.dockSecondaryWidthDp(aspect, secondary),
+            DockControl.FAVORITE to secondary,
+            DockControl.MENU to secondary,
+        )
+    }
+
+    return remember(order, widths, gapDp, availableDp) {
+        fitDockControls(order, widths, gapDp, availableDp)
     }
 }
 
@@ -881,7 +939,10 @@ private fun DockSecondary(label: String, onClick: () -> Unit) {
     // the outline suggests. ~5dp per character plus 60% of the height for the two
     // slanted ends, floored at the square size so "CC" never renders narrower
     // than a regular hexagon.
-    val width = ((label.length * 5).dp + metrics.size * 0.6f).coerceAtLeast(metrics.size)
+    // MK.38.2 — the formula moved to PlayerChromeMetrics so fitDockControls can
+    // ask how wide this will be before it exists. Two copies would drift, and
+    // the symptom is a row that measures as fitting and then does not.
+    val width = PlayerChromeMetrics.dockSecondaryWidthDp(label, metrics.size.value).dp
     HexControl(
         variant = HexVariant.SECONDARY,
         contentDescription = label,

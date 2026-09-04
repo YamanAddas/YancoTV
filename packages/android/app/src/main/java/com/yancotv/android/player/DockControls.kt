@@ -77,5 +77,115 @@ internal fun dockControlOrder(hasNext: Boolean, isLive: Boolean = false): List<D
  * assertion must exclude it — otherwise the test would encode a cursor stop
  * that does not exist and would "pass" a dock where RIGHT skipped a control.
  */
-internal fun dockFocusOrder(hasNext: Boolean, isLive: Boolean = false): List<DockControl> =
-    dockControlOrder(hasNext, isLive).filterNot { it == DockControl.DIVIDER }
+internal fun dockFocusOrder(shown: List<DockControl>): List<DockControl> = shown.filterNot { it == DockControl.DIVIDER }
+
+/**
+ * Convenience for the dock that shows everything.
+ *
+ * MK.38.2 — kept, but no longer the whole story: a narrow screen renders
+ * [DockFit.shown] rather than the full order, so anything reasoning about where
+ * the cursor actually goes must pass that list to the overload above. This one
+ * answers "what would the focus order be if it all fitted", which is the right
+ * question for the brief and the wrong one for a phone.
+ */
+internal fun dockFocusOrder(hasNext: Boolean, isLive: Boolean = false): List<DockControl> = dockFocusOrder(dockControlOrder(hasNext, isLive))
+
+/**
+ * MK.38.2 — what the dock shows, and what it hands to the ⋯ menu.
+ *
+ * ### The bug this closes
+ *
+ * `VodDockTransportRow` renders a plain `Row` and nothing has ever measured it.
+ * Compose's `Row` does not wrap or scroll: once the incoming width is used up,
+ * every remaining child is measured at **zero** and simply is not there. No
+ * warning, no ellipsis, no clipped edge to notice — the control is gone.
+ *
+ * It is gone today, not hypothetically. Every one of the brief's sizes is a
+ * fraction of a 1920 px television, so on a phone in landscape they all fall to
+ * their floors, and the floor for a touched control is 48 dp:
+ *
+ * | Screen (landscape) | Locale | Row needs | Row has | Result |
+ * |---|---|---|---|---|
+ * | 731 dp | English | ~579 dp | 635 dp | fits |
+ * | 731 dp | Spanish | ~610 dp | 635 dp | fits, barely |
+ * | 640 dp | English | ~571 dp | 544 dp | **27 dp cut** |
+ * | 640 dp | Spanish | ~601 dp | 544 dp | **57 dp cut** |
+ *
+ * Spanish is not an edge case, it is `VELOCIDAD` where English has `SPEED`.
+ * And the row is ordered with ⋯ **last**, so the first thing a narrow screen
+ * deletes is the menu — the one control that can reach everything else. The
+ * dock does not degrade, it locks.
+ *
+ * ### The rule
+ *
+ * The owner's brief, from the iOS side of the same problem: a **More** button
+ * that surfaces what does not fit, rather than hiding controls and hoping.
+ * Android already has that button — ⋯ opens the options root, and the root
+ * already holds Subtitles, Audio, Speed, Aspect and Favourites. So a dropped
+ * secondary is not lost, it is one press away in the place it already lived.
+ *
+ * That makes the fix "pin ⋯ and drop around it", not "add a second ⋯". Two
+ * three-dot buttons side by side would be the confusing version of this.
+ *
+ * [DROP_ORDER] is least-useful-first while a stream is playing. Transport and
+ * ⋯ are absent from it and so can never be dropped: without transport there is
+ * no player, and without ⋯ there is no way back to what was dropped.
+ */
+internal data class DockFit(
+    /** Rendered in the row, in [dockControlOrder]'s order. */
+    val shown: List<DockControl>,
+    /**
+     * Dropped for want of width, in [dockControlOrder]'s order — not in the
+     * order they were dropped. This is what the ⋯ menu is standing in for.
+     */
+    val overflow: List<DockControl>,
+)
+
+/**
+ * Dropped first to last. Favourite goes first because saving a title is the one
+ * action here that keeps until playback ends; subtitles go last because a
+ * viewer who needs them needs them now.
+ */
+private val DROP_ORDER = listOf(
+    DockControl.FAVORITE,
+    DockControl.ASPECT,
+    DockControl.SPEED,
+    DockControl.AUDIO,
+    DockControl.SUBTITLES,
+)
+
+/**
+ * Fit [order] into [availableDp], dropping by [DROP_ORDER] until it does.
+ *
+ * @param widthsDp each control's rendered width in dp. A control missing from
+ *   the map counts as zero, which under-counts rather than throwing — a dock
+ *   that renders slightly too wide beats a player that crashes.
+ * @param gapDp the space between two adjacent controls; `n` controls have
+ *   `n - 1` of them, which is the part an eyeballed calculation gets wrong.
+ *
+ * If even the pinned controls do not fit, they are returned anyway: there is no
+ * useful smaller dock, and clipping transport is at least a visible failure.
+ */
+internal fun fitDockControls(order: List<DockControl>, widthsDp: Map<DockControl, Float>, gapDp: Float, availableDp: Float): DockFit {
+    fun measure(list: List<DockControl>): Float = if (list.isEmpty()) {
+        0f
+    } else {
+        list.fold(0f) { acc, c -> acc + (widthsDp[c] ?: 0f) } + gapDp * (list.size - 1)
+    }
+
+    val shown = order.toMutableList()
+    val dropped = mutableSetOf<DockControl>()
+    for (candidate in DROP_ORDER) {
+        if (measure(shown) <= availableDp) break
+        if (shown.remove(candidate)) dropped += candidate
+    }
+
+    // The divider separates the transport cluster from the secondary one. With
+    // every secondary gone it stands between a cluster and nothing, so it is
+    // painted noise taking width the transport controls could use.
+    if (dropped.isNotEmpty() && shown.none { it in DROP_ORDER }) {
+        shown.remove(DockControl.DIVIDER)
+    }
+
+    return DockFit(shown = shown, overflow = order.filter { it in dropped })
+}
