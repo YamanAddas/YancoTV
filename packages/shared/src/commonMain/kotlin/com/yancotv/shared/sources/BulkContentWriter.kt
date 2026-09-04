@@ -3,6 +3,7 @@ package com.yancotv.shared.sources
 import app.cash.sqldelight.db.SqlDriver
 import com.yancotv.shared.content.classifyEntry
 import com.yancotv.shared.content.cleanTitle
+import com.yancotv.shared.content.isPlaylistDivider
 import com.yancotv.shared.diag.beginTraced
 import com.yancotv.shared.diag.commitTraced
 import com.yancotv.shared.diag.rollbackTraced
@@ -464,6 +465,8 @@ class BulkContentWriter(
         now: Long,
         sortOrderStart: Long,
     ): Int {
+        @Suppress("NAME_SHADOWING")
+        val items = items.filterNot { isPlaylistDivider(it.name) }
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
@@ -640,6 +643,8 @@ class BulkContentWriter(
      * monotonic counter across the whole playlist.
      */
     fun writeM3uChunk(sourceId: String, items: List<M3uEntry>, now: Long, sortOrderStart: Long): Int {
+        @Suppress("NAME_SHADOWING")
+        val items = items.filterNot { isPlaylistDivider(it.title) }
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
@@ -688,6 +693,8 @@ class BulkContentWriter(
     }
 
     fun writeStalkerLiveChunk(sourceId: String, items: List<StalkerChannel>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
+        @Suppress("NAME_SHADOWING")
+        val items = items.filterNot { isPlaylistDivider(it.name) }
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)

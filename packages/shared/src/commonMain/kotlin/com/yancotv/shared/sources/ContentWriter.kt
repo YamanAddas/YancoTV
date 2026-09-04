@@ -2,6 +2,7 @@ package com.yancotv.shared.sources
 
 import com.yancotv.shared.content.classifyEntry
 import com.yancotv.shared.content.cleanTitle
+import com.yancotv.shared.content.isPlaylistDivider
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.parsers.M3uEntry
 import com.yancotv.shared.stalker.StalkerChannel
@@ -56,6 +57,8 @@ class ContentWriter(private val db: YancoDb) {
 
     /** Writes M3U entries for [sourceId]. Returns number of rows inserted. */
     fun writeM3u(sourceId: String, entries: List<M3uEntry>, now: Long, onProgress: (current: Int, total: Int) -> Unit = { _, _ -> }): Int {
+        @Suppress("NAME_SHADOWING")
+        val entries = entries.filterNot { isPlaylistDivider(it.title) }
         val total = entries.size
         var written = 0
         db.transaction {
@@ -127,6 +130,8 @@ class ContentWriter(private val db: YancoDb) {
         sortOrderStart: Long,
         now: Long,
     ): Int {
+        @Suppress("NAME_SHADOWING")
+        val items = items.filterNot { isPlaylistDivider(it.name) }
         if (items.isEmpty()) return 0
         db.transaction {
             for ((i, s) in items.withIndex()) {

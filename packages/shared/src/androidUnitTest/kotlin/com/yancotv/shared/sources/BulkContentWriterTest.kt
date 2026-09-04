@@ -187,6 +187,65 @@ class BulkContentWriterTest {
         assertEquals(1, hits.size)
     }
 
+    // ───── MK.36.3 — playlist banner rows ─────
+
+    @Test
+    fun `writeM3uChunk drops banner rows and keeps everything else`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+
+        writer.prepareSource("s1")
+        val written =
+            writer.writeM3uChunk(
+                "s1",
+                listOf(
+                    m3uEntry("##### beIN SP⚽RTS ᴴᴰ #####", "http://a/1.ts"),
+                    m3uEntry("BBC News", "http://a/2.ts"),
+                    m3uEntry("=== SPORTS ===", "http://a/3.ts"),
+                    // Not banners: a run at one end only, and a mid-string dash.
+                    m3uEntry("### SPORTS", "http://a/4.ts"),
+                    m3uEntry("Ping-Pong -- Live", "http://a/5.ts"),
+                ),
+                now = 100L,
+                sortOrderStart = 0L,
+            )
+        writer.finishSource("s1")
+
+        assertEquals(3, written)
+        assertEquals(3L, db.contentQueries.countBySource("s1").executeAsOne())
+        val titles = db.contentQueries.selectByType("live").executeAsList().map { it.title }
+        // The two banners are gone; the three near-misses all survive.
+        // `### SPORTS` survives deliberately — a run at ONE end is not a banner,
+        // and "no title starts with #" would have been the wrong rule to assert.
+        assertEquals(setOf("BBC News", "### SPORTS", "Ping-Pong -- Live"), titles.toSet())
+    }
+
+    @Test
+    fun `writeLiveChunk drops banner rows`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+
+        writer.prepareSource("s1")
+        writer.writeLiveChunk(
+            sourceId = "s1",
+            client = xtreamClient(),
+            items = listOf(
+                liveStream(1, "###### RELAX ᵁᴴᴰ 3840P ######"),
+                liveStream(2, "Al Hayat"),
+            ),
+            categoryNames = mapOf("1" to "News"),
+            now = 100L,
+            sortOrderStart = 0L,
+        )
+        writer.finishSource("s1")
+
+        assertEquals(1L, db.contentQueries.countBySource("s1").executeAsOne())
+    }
+
     // ───── Xtream ─────
 
     @Test

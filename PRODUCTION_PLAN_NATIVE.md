@@ -2921,6 +2921,48 @@ Windows (see MK.35.4), so the substitute gates carried this:
 
 Full suite: **824 tests, 0 failures, 0 errors**. `:app:assembleDebug` green.
 
+### MK.36.3 — playlist banner rows are not channels — shipped 2026-09-03
+
+909 of 273,869 rows on the owner's account are provider *headings* dressed as channels —
+`##### beIN SP⚽RTS ᴴᴰ #####`, `### ARABIC 24/7 4K UHD 3840P ###`. They carry a stream URL because
+a flat M3U has nowhere else to put a section marker, `isPlayable` says yes to all of them, and they
+sort to the front of their group. One was the first tile on Home: tapping the first channel on the
+screen opened a spinner that never resolved, and it cost 48 seconds of a recording test and a wrong
+conclusion about the recorder before anyone read the name.
+
+**Filtered at write time, not read time.** The iOS side wired `isPlaylistDivider` into
+`YancoServices.ios.kt` as a post-read filter. That does not port: browse here is paged, so a filter
+applied after the page is fetched drifts `count()` against the rows actually returned — ask for 100,
+render 97, and the pager's arithmetic is wrong from then on. Filtering at the write is also the
+honest model: these rows are not content, and storing them was the bug.
+
+Applied at every entry point that writes a title-bearing live row:
+`BulkContentWriter.writeLiveChunk` / `writeM3uChunk` / `writeStalkerLiveChunk`, and
+`ContentWriter.writeM3u` / `appendXtreamLive`. `ContentWriter.writeStalker` is deliberately
+untouched — it has no callers left; if it is ever revived, it needs the same line.
+
+**The signatures did not change.** The first attempt renamed the list parameter to `rawItems`,
+which broke 16 named-argument call sites in `BulkContentWriterTest` and would have been a
+gratuitous API break for anyone calling with `items = `. The shipped form is
+`@Suppress("NAME_SHADOWING") val items = items.filterNot { isPlaylistDivider(it.name) }` — public
+signature untouched, and every batching/transaction body byte-identical, which matters because this
+is the code path that emptied a catalogue in MB-353.
+
+**Effect is deferred to the next sync.** Existing rows stay until the source re-syncs, since the
+write path is the only thing that changed. Auto-sync-on-start sources clear on the next launch. A
+migration was considered and rejected: the rule needs "three or more of the *same* character at
+*both* ends", which in SQL is a dozen OR'd GLOBs over 274k rows for a cosmetic gain.
+
+**Known gap — the TypeScript mirror.** `packages/core/` has no `isPlaylistDivider`, so desktop still
+shows banner rows. This is a real AGENTS.md rule 8 divergence and it is recorded rather than hidden:
+the desktop toolchain could not be brought up in this session (`pnpm install` fails resolving
+`mpegts.js@1.8.0`), so porting it blind and untested would have been worse than saying so. Follow-up
+is MK.36.3b.
+
+Verified: 826 shared tests, 0 failures (2 new — one asserts the two banners are dropped **and**
+that `### SPORTS`, `Ping-Pong -- Live` and `BBC News` all survive; the first draft of that assertion
+was wrong, not the filter). `:app:assembleDebug` and `:shared:lintDebug` green.
+
 ### What is deliberately NOT switched on, and why each needs real work
 
 Naming these here because the merge makes them *look* available. They are not.
