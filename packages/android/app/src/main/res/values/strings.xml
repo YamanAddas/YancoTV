@@ -575,6 +575,7 @@
     <string name="cf_episodes">Episodes</string>
     <string name="cf_now">Now: %1$s</string>
     <string name="cf_up_next">Up next: %1$s</string>
+    <string name="gl_no_guide">No guide for this channel</string>
     <string name="cf_in_favorites">In favorites</string>
     <string name="cf_favorite">Favorite</string>
     <string name="cf_subtitles">Subtitles</string>

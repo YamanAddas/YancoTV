@@ -3465,6 +3465,40 @@ TV has no sources at all and the Chromecast's account showed none), and the phon
 carry no continue-watching or EPG-now data. The arithmetic and the unit tests cover it; a device
 look is still owed.
 
+### MK.37.E — the guide as a list where a timeline will not fit — shipped 2026-09-04
+
+A guide grid is channels down and time across, and it needs width. At the shipped density a phone in
+portrait has room for **about ninety minutes of one channel** — not a guide, but a very wide list
+with most of it off-screen and a horizontal scrollbar standing in for the information.
+
+`GuideList` gives a tall window the same facts arranged for its shape: one row per channel, what is
+on now with how far through it is, and what is next. The timeline is the part that does not fit;
+"what is on" is what people came for, and it does.
+
+Branched on `ShellMetrics.usesCoverflow` — the same property the shell and the browse screen read,
+so the three cannot disagree about the shape of the window they are in.
+
+**Three pure helpers carry all of the row's logic, and all three are tested.** `nowProgramme` uses a
+**half-open** window (`start until end`): a programme ending exactly now is over and the one starting
+exactly now is on, where treating both ends as inclusive shows two programmes as current for one
+second every half hour. `programmeProgress` guards a zero or negative span, because providers ship
+rows where a programme ends when it starts and a divide-by-zero on a progress bar is not a trade
+worth making. Times are unix **seconds** throughout, matching `epg_programmes` and MB-390.
+
+Long programme titles marquee rather than truncate, for the reason MK.37.C.3 established: a
+truncated title usually loses the episode or match that identifies it.
+
+**Deliberately not carried over.** The grid's per-programme affordances — tapping a *future* block
+for a reminder, a *past* one for catch-up — have no target in a list, which shows one programme per
+channel rather than an evening of them. A row here plays the channel. Those stay on the grid for
+wide windows; inventing a long-press menu for them belongs in its own slice rather than being
+smuggled into a layout change.
+
+Verified: Pixel XL portrait renders the list, full-width rows, the no-guide branch showing correctly
+for channels the sample sources carry no EPG for. Chromecast still renders the **grid** — time
+headers present, no list text, 0 fatals. `GuideListTest` covers the seam, the gap, the empty channel
+and the zero-length programme.
+
 ### Remaining slices
 
 | Slice | Scope |

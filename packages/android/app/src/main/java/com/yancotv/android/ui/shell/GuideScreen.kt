@@ -83,6 +83,7 @@ import com.yancotv.android.ui.components.YancoPrimaryButton
 import com.yancotv.android.ui.focus.onEndwardKey
 import com.yancotv.android.ui.focus.onStartwardKey
 import com.yancotv.android.ui.parental.ChannelActionsMenu
+import com.yancotv.android.ui.theme.LocalShellMetrics
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.catchup.CatchupService
 import com.yancotv.shared.content.ContentRepository
@@ -644,6 +645,22 @@ fun GuideScreen(
                     compact = true,
                     onRefreshed = { reloadTick++ },
                 )
+                // MK.37.E — a timeline needs width. At the shipped density a
+                // phone in portrait fits about ninety minutes of ONE channel,
+                // which is not a guide. A tall window gets the same facts as a
+                // list instead. Same rule the shell and the browse screen read,
+                // so the three cannot disagree about the shape of the window.
+                if (!LocalShellMetrics.current.usesCoverflow) {
+                    GuideList(
+                        channels = guide!!.channels,
+                        nowSeconds = nowSeconds,
+                        listState = listState,
+                        onPlay = onPlay,
+                        onChannelLongPress = onChannelLongPress,
+                        modifier = Modifier.weight(1f),
+                    )
+                    return@Column
+                }
                 GuideGrid(
                     guide = guide!!,
                     nowSeconds = nowSeconds,

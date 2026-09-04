@@ -552,6 +552,7 @@
     <string name="cf_episodes">الحلقات</string>
     <string name="cf_now">الآن: %1$s</string>
     <string name="cf_up_next">التالي: %1$s</string>
+    <string name="gl_no_guide">لا يوجد دليل لهذه القناة</string>
     <string name="cf_in_favorites">في المفضلة</string>
     <string name="cf_favorite">إضافة للمفضلة</string>
     <string name="cf_subtitles">الترجمة</string>
