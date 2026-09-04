@@ -731,6 +731,44 @@ fun HomeScreen(
         }
         }
 
+        // MK.37.H.1 — the More sheet.
+        //
+        // `SectionFlowBar` has been setting `showOverflow` since MK.37.B and
+        // NOTHING read it: the sheet composable was written and never rendered.
+        // Tapping More therefore ran the indicator out to its slot and back and
+        // opened nothing, which is exactly what it looked like — the marker
+        // returning to where it came from. Neither the compiler nor lint could
+        // catch it; a public composable that is never called is not an unused
+        // symbol.
+        //
+        // Built like the search overlay above rather than as a Material sheet,
+        // so it dims the shell the same way and dismisses on a scrim tap or on
+        // BACK. Anchored to the bottom because that is where the bar it belongs
+        // to lives.
+        if (showOverflow) {
+            BackHandler { showOverflow = false }
+            Box(
+                modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .pointerInput(Unit) { detectTapGestures { showOverflow = false } },
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                // Swallows taps that land on the sheet itself, so choosing a
+                // destination does not also dismiss through the scrim beneath.
+                Box(modifier = Modifier.pointerInput(Unit) { detectTapGestures { } }) {
+                    SectionOverflowSheet(
+                        current = section,
+                        onSelect = {
+                            section = it
+                            showOverflow = false
+                        },
+                    )
+                }
+            }
+        }
+
         // Search overlay — rides above the Row so it dims everything.
         // Audit-pass-1: `.clickable` on the scrim and the inner Box was
         // creating two extra focusable D-pad targets on TV (same root

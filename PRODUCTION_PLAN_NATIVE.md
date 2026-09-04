@@ -3661,6 +3661,34 @@ fatals, never stuck on the splash. Fire TV 2265 ms and Chromecast 2001 ms — bo
 3827/3291 ms measured before, since the splash frame draws ahead of the shell — both reaching the
 shell, 0 fatals.
 
+### MK.37.H.1 — the More sheet was never rendered — shipped 2026-09-04
+
+Tapping **More** ran the bar's indicator out to its slot and back and opened nothing. That is
+exactly what it looked like from the outside — "بترجع المؤشر لمكان ما كان" — and the animation was
+the only part working as designed.
+
+`SectionFlowBar` has been setting `showOverflow` since MK.37.B, and **nothing read it**.
+`SectionOverflowSheet` was written in the same commit and never called. The flag flipped, the
+indicator did its return animation because the bar treats the overflow slot as a non-destination,
+and the four hidden destinations — Guide, Recordings, Search, Settings — were unreachable on a phone
+for four commits.
+
+**Nothing could have caught this but using it.** The compiler is satisfied: a public composable that
+is never called is not an unused symbol. Lint is satisfied for the same reason. `showOverflow` is
+written and never read, which a warning *could* in principle flag, but not through a
+`rememberSaveable` delegate. The gap between "the code exists" and "the code runs" is only closed by
+driving the app, and MK.37.B's device pass checked that the bar *rendered* — six slots, correct
+labels, indicator lifting — without ever pressing the sixth one.
+
+Rendered like the search overlay directly above it rather than as a Material sheet, so it dims the
+shell the same way, dismisses on a scrim tap and on BACK, and is anchored to the bottom where the bar
+it belongs to lives. A tap-swallowing box under the sheet stops a choice falling through to the scrim.
+
+Verified on the Pixel XL: More opens the sheet with all four destinations (Guide, Recordings, Search,
+Settings); choosing Settings navigates there and dismisses the sheet; BACK dismisses it and stays in
+the app on Home. Fire TV and Chromecast both reach the shell with no bottom bar composed at all,
+0 fatals.
+
 ### Remaining slices
 
 | Slice | Scope |
