@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   createRecentChannelsStore,
   type RecentChannelsAdapter,
-} from '@yancotv/core';
+} from '@yancotv/core/stores';
 
 function makeMemoryAdapter(initial: string[] = []): RecentChannelsAdapter & {
   writes: string[][];

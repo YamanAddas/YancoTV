@@ -53,7 +53,7 @@ describe('backup-service', () => {
   });
 
   it('produces a backup with the current version and app version', () => {
-    const b = buildBackup();
+    const { backup: b } = buildBackup();
     expect(b.version).toBe(BACKUP_VERSION);
     expect(b.appVersion).toBe('0.1.0-test');
     expect(typeof b.exportedAt).toBe('number');
@@ -77,7 +77,7 @@ describe('backup-service', () => {
         now,
       );
 
-    const b = buildBackup();
+    const { backup: b } = buildBackup();
     expect(b.sources).toHaveLength(1);
     expect(b.sources[0].username).toBe('myuser');
     expect(b.sources[0].password).toBe('mypass');
@@ -92,7 +92,7 @@ describe('backup-service', () => {
       .prepare('INSERT INTO favorites (id, content_id, added_at) VALUES (?, ?, ?)')
       .run('fav-1', 'c-1', 1700000000000);
 
-    const b = buildBackup();
+    const { backup: b } = buildBackup();
     expect(b.favorites).toHaveLength(1);
     expect(b.favorites[0].contentId).toBe('c-1');
     expect(b.favorites[0].addedAt).toBe(1700000000000);
@@ -118,7 +118,7 @@ describe('backup-service', () => {
       )
       .run('h-2', 'c-2', 60, 1800, 200);
 
-    const b = buildBackup();
+    const { backup: b } = buildBackup();
     expect(b.history).toHaveLength(2);
     expect(b.history[0].id).toBe('h-2'); // newest first
     expect(b.history[0].ref).toMatchObject({ sourceId: 'src-1', streamUrl: 'http://s/b', title: 'B' });
@@ -129,7 +129,7 @@ describe('backup-service', () => {
     currentDb.prepare("INSERT INTO settings (key, value) VALUES ('ui_theme', 'dark')").run();
     currentDb.prepare("INSERT INTO settings (key, value) VALUES ('playback_default_volume', '80')").run();
 
-    const b = buildBackup();
+    const { backup: b } = buildBackup();
     expect(b.settings.ui_theme).toBe('dark');
     expect(b.settings.playback_default_volume).toBe('80');
   });
@@ -144,7 +144,7 @@ describe('backup-service', () => {
       )
       .run();
 
-    const b = buildBackup();
+    const { backup: b } = buildBackup();
     expect(b.parental.lockedChannelIds.sort()).toEqual(['c-1', 'c-2']);
     expect(b.parental.hiddenChannelIds).toEqual(['c-3']);
     expect(b.parental.overrides['c-1']).toMatchObject({ customName: 'Renamed', customNumber: 7 });
@@ -158,7 +158,7 @@ describe('backup-service', () => {
       )
       .run();
 
-    const b = buildBackup();
+    const { backup: b } = buildBackup();
     expect(b.groupPreferences).toHaveLength(2);
     const byKey = Object.fromEntries(b.groupPreferences.map((g) => [g.groupKey, g]));
     expect(byKey.news).toMatchObject({ contentType: 'live', isPinned: true, customName: 'News (Pinned)' });
@@ -415,7 +415,7 @@ describe('backup-service', () => {
         .prepare("INSERT INTO settings (key, value) VALUES ('ui_theme', 'oled')")
         .run();
 
-      const snapshot = buildBackup();
+      const { backup: snapshot } = buildBackup();
 
       // Wipe favorites + settings only — leave source/content in place so the
       // re-link by (sourceId, streamUrl) can resolve during import.

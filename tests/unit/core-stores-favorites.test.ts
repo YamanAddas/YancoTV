@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   createFavoritesStore,
   type FavoritesAdapter,
-} from '@yancotv/core';
+} from '@yancotv/core/stores';
 
 function makeMemoryAdapter(initial: string[] = []): FavoritesAdapter & {
   ids: Set<string>;

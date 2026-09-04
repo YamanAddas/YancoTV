@@ -27,16 +27,29 @@ const queryClient = new QueryClient({
   },
 });
 
-// Map setting values to route paths
+// Map setting values to route paths.
+//
+// Every value here MUST name a route declared below. Two did not, and both
+// produced an infinite redirect: '/' -> <Navigate to={startRoute}> -> the same
+// place, forever.
+//   - `history: '/history'` — there is no History page and never was, yet
+//     "History" was offered in the start-page dropdown, so any user who picked
+//     it hit the loop on every launch.
+//   - `home: '/'` — self-referential. Not offered in the dropdown, so it was
+//     unreachable in practice, but a stored setting would have done it.
+// `history` is gone from the map and from the dropdown; `home` now points at
+// the real `/home` route.
 const START_PAGE_ROUTES: Record<string, string> = {
   live: '/live',
   movies: '/movies',
   series: '/series',
   guide: '/guide',
   favorites: '/favorites',
-  history: '/history',
-  home: '/',
+  home: '/home',
 };
+
+/** Paths that actually have a <Route> below. Guards the start-page lookup. */
+const ROUTED_START_PATHS = new Set(Object.values(START_PAGE_ROUTES));
 
 function AppInner() {
   const { load, get } = useSettingsStore();
@@ -121,7 +134,14 @@ function AppInner() {
 
   // Resolve the configured start page to a route
   const startPageSetting = get('ui_start_page');
-  const startRoute = START_PAGE_ROUTES[startPageSetting] ?? '/live';
+  // The `?? '/live'` fallback only covers a value that is absent from the map.
+  // It could not save a user who had already SAVED `startPage: 'history'`
+  // before the entry was removed — for them the lookup succeeded and returned a
+  // path with no route. Resolving through the known-good set means a stale or
+  // hand-edited setting lands on Live TV instead of a redirect loop.
+  const mapped = START_PAGE_ROUTES[startPageSetting];
+  const startRoute =
+    mapped && ROUTED_START_PATHS.has(mapped) ? mapped : '/live';
 
   return (
     <Routes>

@@ -189,7 +189,6 @@ export function GeneralSettings() {
               { value: 'series', label: 'Series' },
               { value: 'guide', label: 'TV Guide' },
               { value: 'favorites', label: 'Favorites' },
-              { value: 'history', label: 'History' },
             ]}
           />
         </SettingRow>
