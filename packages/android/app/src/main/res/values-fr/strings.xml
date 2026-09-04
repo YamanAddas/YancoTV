@@ -73,6 +73,7 @@
     <string name="section_recordings">Enregistrements</string>
     <string name="section_search">Recherche</string>
     <string name="section_settings">Paramètres</string>
+    <string name="section_more">Plus</string>
     <string name="section_placeholder">%1$s — arrive dans une prochaine version.</string>
     <string name="home_eyebrow_for_you">POUR VOUS</string>
     <string name="home_continue_title">Reprendre la lecture</string>

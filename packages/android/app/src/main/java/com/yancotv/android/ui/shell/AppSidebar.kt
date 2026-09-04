@@ -265,7 +265,12 @@ internal fun badgeSection(section: AppSection, updateAvailable: Boolean): Boolea
 internal fun bindActiveRowFocus(section: AppSection, current: AppSection, activeRowFocus: FocusRequester?): FocusRequester? =
     if (section == current) activeRowFocus else null
 
-private fun iconFor(section: AppSection): ImageVector = when (section) {
+/**
+ * MK.37.B — `internal`, not private: [SectionFlowBar] renders the same
+ * destinations on a phone and must show the same glyph for each. Copying the
+ * mapping into the bar is how the rail and the bar drift apart.
+ */
+internal fun iconFor(section: AppSection): ImageVector = when (section) {
     AppSection.Home -> YancoIcons.Home
     AppSection.LiveTv -> YancoIcons.Live
     AppSection.Guide -> YancoIcons.Guide

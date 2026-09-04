@@ -5,11 +5,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Text
@@ -374,12 +377,40 @@ fun HomeScreen(
     // it was. Screens adopt `LocalShellMetrics` one at a time from MK.37.B,
     // each with its own TV pass.
     CompositionLocalProvider(LocalShellMetrics provides rememberShellMetrics()) {
+    val shellMetrics = LocalShellMetrics.current
+    val usesSidebar = shellMetrics.usesSidebar
+    var showOverflow by rememberSaveable { mutableStateOf(false) }
+
     Box(modifier = Modifier.fillMaxSize()) {
         CinematicBackground(modifier = Modifier.fillMaxSize())
+        // MK.37.B — the existing Row is untouched and simply gains a Column
+        // around it, so the television takes a single weighted child and lays
+        // out exactly as before. On a phone in portrait the rail is dropped and
+        // the bar is appended; nothing in between changes.
+        Column(modifier = Modifier.fillMaxSize()) {
         // MK.28.1 — the background above stays full-bleed under the
         // transparent system bars; every interactive child is inset by
         // safeDrawing (system bars + display cutout + IME). Zero on TV.
-        Row(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+        //
+        // MK.37.B — when the bar is present it owns the BOTTOM inset, so the
+        // content above must not consume it too; otherwise the bar floats above
+        // a stripe of background instead of running under the gesture bar.
+        Row(
+            modifier =
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .windowInsetsPadding(
+                    if (usesSidebar) {
+                        WindowInsets.safeDrawing
+                    } else {
+                        WindowInsets.safeDrawing.only(
+                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                        )
+                    },
+                ),
+        ) {
+            if (usesSidebar) {
             AppSidebar(
                 current = section,
                 onSelect = { newSection ->
@@ -451,6 +482,7 @@ fun HomeScreen(
                 activeRowFocus = sidebarFocus,
                 modifier = Modifier.onFocusChanged { sidebarHasFocus = it.hasFocus },
             )
+            }
 
             if (contentType != null) {
                 // Concept A — Live TV / Movies / Series share the cascading
@@ -673,6 +705,15 @@ fun HomeScreen(
                     PlaceholderArea(section = section)
                 }
             }
+        }
+
+        if (!usesSidebar) {
+            SectionFlowBar(
+                current = section,
+                onSelect = { section = it },
+                onOpenOverflow = { showOverflow = true },
+            )
+        }
         }
 
         // Search overlay — rides above the Row so it dims everything.

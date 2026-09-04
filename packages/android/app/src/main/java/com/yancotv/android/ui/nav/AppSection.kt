@@ -23,4 +23,22 @@ enum class AppSection(@StringRes val labelRes: Int, val contentType: ContentType
     Recordings(R.string.section_recordings),
     Search(R.string.section_search),
     Settings(R.string.section_settings),
+    ;
+
+    companion object {
+        /**
+         * The five destinations the compact bottom bar carries.
+         *
+         * MK.37.B — nine will not fit a phone's width at a legible size, so the
+         * bar takes the five that are browsing (where a viewer spends their
+         * time) and [compactOverflow] keeps the rest one tap away. Nothing is
+         * removed; it is re-homed. The rail on TV and tablet still shows all
+         * nine, which is why this list lives here rather than in the bar — the
+         * split is a fact about the destinations, not about one widget.
+         */
+        val compactPrimary: List<AppSection> = listOf(Home, LiveTv, Movies, Series, Favorites)
+
+        /** The four that move into the More sheet on a phone. */
+        val compactOverflow: List<AppSection> = listOf(Guide, Recordings, Search, Settings)
+    }
 }

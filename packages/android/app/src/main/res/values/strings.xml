@@ -85,6 +85,7 @@
     <string name="section_recordings">Recordings</string>
     <string name="section_search">Search</string>
     <string name="section_settings">Settings</string>
+    <string name="section_more">More</string>
     <string name="section_placeholder">%1$s — coming in a later milestone.</string>
     <string name="home_eyebrow_for_you">FOR YOU</string>
     <string name="home_continue_title">Continue watching</string>

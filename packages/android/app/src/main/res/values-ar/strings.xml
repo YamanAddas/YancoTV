@@ -73,6 +73,7 @@
     <string name="section_recordings">التسجيلات</string>
     <string name="section_search">البحث</string>
     <string name="section_settings">الإعدادات</string>
+    <string name="section_more">المزيد</string>
     <string name="section_placeholder">%1$s — قادم في مرحلة لاحقة.</string>
     <string name="home_eyebrow_for_you">لك</string>
     <string name="home_continue_title">متابعة المشاهدة</string>

@@ -3239,6 +3239,56 @@ would move if the layer had leaked into rendering.)
 rotate. The layer is unit-tested at phone and tablet viewports, but nothing has been *looked at* in
 portrait on real hardware. That is the first thing 37.B should do.
 
+### MK.37.B — the phone gets a bottom bar, and the shell chooses — shipped 2026-09-03
+
+`HomeScreen` now branches on `ShellMetrics.usesSidebar`: rail on TV, tablet and any short window;
+a bottom bar when the window is both narrow and tall.
+
+**The diff is deliberately small.** The existing `Row(AppSidebar, content)` is untouched — it gains a
+`Column` around it, the sidebar call gains an `if`, and the bar is appended. On television the
+Column has a single weighted child, which lays out identically to the bare Row it replaced. Measured
+on the Fire TV after the change: `Home [40,160][160,264]`, `Live TV [40,268][160,372]`,
+`Movies [40,484][160,588]` — byte-identical to the pre-MK.37 baseline.
+
+**`SectionFlowBar`** is the iOS bar ported: one accent hexagon that *travels* rather than appearing
+and vanishing, with every cell lifting, brightening and scaling by its continuous distance from the
+indicator, and a finger able to drag along the bar with the destination committing on release.
+`Spring.DampingRatioNoBouncy` — a navigation bar used forty times an hour should be machined, not
+bouncy. Five destinations plus a More sheet for the other four; `AppSection.compactPrimary` /
+`compactOverflow` own that split because it is a fact about the destinations, not about one widget.
+
+**Insets are split.** With the bar present the content Row insets for top and sides only and the bar
+takes the bottom, so the bed runs under the gesture bar instead of floating above a stripe of
+background. The TV branch keeps the original full `safeDrawing`, which resolves to zero there anyway.
+
+**Reuse rather than re-draw.** `iconFor` moved from private to internal so the bar shows the same
+glyph the rail does; copying the mapping is how the two drift. The `More` glyph is a new hand-rolled
+icon in the existing line-weight family — three round-capped strokes, not filled circles, because a
+filled glyph beside eight stroked ones reads as a different product. `section_more` is translated in
+all four shipped locales; an untranslated string would have fallen back to English mid-Arabic.
+
+Verified on hardware:
+
+| | window | result |
+|---|---|---|
+| Pixel XL portrait | 1440x2560 (411x731 dp) | bar renders, six slots across the full width, sidebar gone, content reclaims the 280 px the rail held |
+| Pixel XL landscape | 2560x1440 (731x411 dp) | rail returns, bar gone — the rule holds in both directions on one device |
+| Fire TV AFTDCT31 | 1920x1080 | sidebar geometry byte-identical to baseline, no bar |
+| Chromecast | 1920x1080 | unchanged (its rail reads 456 px wide only because focus was left in it and it expands on focus) |
+
+The selected cell sits 7 px higher than its neighbours on the phone, which is the `-2.dp * nearness`
+lift at density 3.5 — the indicator's wave is doing what it should.
+
+**Known, and 37.D's job.** Tiles are still 770 px wide — 53% of a 1440 px screen — because
+`ShellDim.posterTile` is a Fire-TV number and nothing reads `ShellMetrics.tileWidth` yet. The right
+edge of every rail is still clipped mid-tile; it is *less* clipped than before only because the rail's
+280 px came back. Navigation is fixed in this slice; sizing is not.
+
+**Known, not introduced here.** In landscape the rail wants 9 x 52 dp = 468 dp against a 411 dp
+window, so the last destinations sit below the fold. `AppSidebar` already scrolls
+(`verticalScroll`), so they are reachable — but a phone in landscape having to scroll a navigation
+rail is worth revisiting when 37.D touches sizing.
+
 ### Remaining slices
 
 | Slice | Scope |

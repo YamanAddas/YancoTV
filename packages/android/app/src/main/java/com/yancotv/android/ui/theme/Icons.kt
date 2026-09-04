@@ -18,6 +18,22 @@ import androidx.compose.ui.unit.dp
  * better than the thicker default material line weight.
  */
 object YancoIcons {
+    /**
+     * MK.37.B — the compact bar's overflow. Three dots, drawn as three short
+     * horizontal strokes rather than filled circles: the family is line-weight
+     * throughout, and a filled glyph beside eight stroked ones reads as a
+     * different product. Round caps make them read as dots at 24 dp anyway.
+     */
+    val More: ImageVector =
+        buildLine("more") {
+            moveTo(6f, 12f)
+            lineTo(6.01f, 12f)
+            moveTo(12f, 12f)
+            lineTo(12.01f, 12f)
+            moveTo(18f, 12f)
+            lineTo(18.01f, 12f)
+        }
+
     val Home: ImageVector =
         buildLine("home") {
             moveTo(3f, 11.5f)
