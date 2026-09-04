@@ -1,6 +1,7 @@
 package com.yancotv.android.ui.shell
 
 import android.annotation.SuppressLint
+import android.os.SystemClock
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
@@ -186,10 +187,23 @@ fun SearchScreen(
                         val jobs =
                             listOf(ContentType.LIVE, ContentType.MOVIE, ContentType.SERIES).map { type ->
                                 async {
+                                    // MK.36.1 — how long the query actually took.
+                                    // The failure paths below have always been
+                                    // logged; the success path was not, so
+                                    // "search feels slow" could never be answered
+                                    // with a number, and the CROSS JOIN query-plan
+                                    // fix could not be measured on a device.
+                                    val startedAt = SystemClock.elapsedRealtime()
                                     runCatching {
                                         withTimeout(8_000L) {
                                             repo.searchByType(trimmed, type, limit = 100)
                                         }
+                                    }.onSuccess { rows ->
+                                        Log.i(
+                                            "Yanco",
+                                            "search[$type] '" + trimmed + "' -> " + rows.size +
+                                                " rows in " + (SystemClock.elapsedRealtime() - startedAt) + "ms",
+                                        )
                                     }.onFailure { t ->
                                         when (t) {
                                             is TimeoutCancellationException ->

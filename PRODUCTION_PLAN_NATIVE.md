@@ -2921,6 +2921,47 @@ Windows (see MK.35.4), so the substitute gates carried this:
 
 Full suite: **824 tests, 0 failures, 0 errors**. `:app:assembleDebug` green.
 
+### MK.36.1 correction — the search claim was wrong on Android — measured 2026-09-03
+
+MK.36.1's commit message and the row above say search "stops timing out" and cite the fork's
+3m22s -> 0.09s. **That does not reproduce on Android, and the reasoning behind it was wrong.**
+
+Measured on the Chromecast against the real 274,097-row catalogue, both query plans built and
+installed in turn, every run from a cold start with the sync verified idle:
+
+| query | pre-fix plan (`FROM content JOIN content_fts`) | shipped plan (`FROM content_fts CROSS JOIN content`) |
+|---|---|---|
+| `the` | 2179 / 2780 / 3966 ms | 3169 / 3694 / 3856 ms — and 2888 / 4178 / 4786 on a re-run |
+| `a` | 568 / 582 / 1046 ms | 591 / 601 / 1221 ms |
+| `sport` | 153 / 282 / 312 ms (warm) | 1147 / 1365 / 1367 ms (cold, first after install) |
+
+The two plans are indistinguishable, and where they differ the *old* one is marginally ahead. The
+`sport` row is not a regression — it is a cache artefact: that query ran first after an install in
+one set and second in the other, and the FTS pages are not in the OS file cache on a cold start.
+Which is itself the lesson — the only comparable measurements are like-for-like in cache state.
+
+**Why the fork's number is real but not ours.** The catastrophic plan was
+`countSearchFtsByType`, and its own comment in `Content.sq` says so: "This is the query that made
+the CROSS JOIN above mandatory." **That query has no Android call site.** `SearchScreen` calls
+`searchByType` only; the count exists for the iOS paged-search UI, which shows how many results are
+being held back. Android never ran the query that took 3m22s.
+
+**The evidence cited for the opposite was misread.** MK.36.1 pointed at the existing
+`SearchScreen.searchByType(...) timed out` warning as proof Android had been hitting the bad plan.
+That log covers any 8-second overrun, and `SearchScreen`'s own comment names the likelier cause:
+"a sync can still hold the SQLite write lock, so any single query may take seconds". A timeout
+during a sync is not evidence of a bad query plan.
+
+**The change stays.** It is harmless on Android, load-bearing on iOS, and one query set for both
+platforms is the point of rule 8. What changes is the claim: this was not an Android win, and
+MK.36.1 should not be read as having delivered one.
+
+**What Android search actually costs**, now that `SearchScreen` logs successful queries as well as
+failures (added in the same commit as this correction): 44 ms for a narrow term (`bein`), 116-209 ms
+for `movie`, and 2.9-4.8 s worst case for `the` — the broadest term in the set — against a
+274,097-row catalogue. Every run finished inside the 8 s timeout and no timeout fired in 27
+measured queries.
+
 ### MK.36.3 — playlist banner rows are not channels — shipped 2026-09-03
 
 909 of 273,869 rows on the owner's account are provider *headings* dressed as channels —
