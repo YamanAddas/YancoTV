@@ -39,10 +39,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.R
 import com.yancotv.android.ui.nav.AppSection
@@ -148,6 +150,12 @@ fun SectionFlowBar(current: AppSection, onSelect: (AppSection) -> Unit, onOpenOv
         ) {
             val slotWidth = maxWidth / slots
             val slotPx = with(LocalDensity.current) { slotWidth.toPx() }
+            // MB-416 - the Row below and the indicator's offset are both
+            // layout-direction aware, so on an Arabic phone the bar draws
+            // right-to-left. Pointer input is not: position.x is a distance
+            // from the physical left edge either way. Two of the three agreed
+            // and the third did not, so every tab activated its mirror.
+            val barRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
             fun commit(index: Int) {
                 if (index >= items.size) {
@@ -169,12 +177,12 @@ fun SectionFlowBar(current: AppSection, onSelect: (AppSection) -> Unit, onOpenOv
                 modifier =
                 Modifier
                     .fillMaxSize()
-                    .pointerInput(slotPx, items, current) {
+                    .pointerInput(slotPx, items, current, barRtl) {
                         detectTapGestures { offset ->
-                            commit((offset.x / slotPx).toInt().coerceIn(0, slots - 1))
+                            commit(flowBarSlotAt(offset.x, slotPx, slots, barRtl))
                         }
                     }
-                    .pointerInput(slotPx, items, current) {
+                    .pointerInput(slotPx, items, current, barRtl) {
                         detectHorizontalDragGestures(
                             onDragStart = { dragging = true },
                             onDragEnd = {
@@ -186,7 +194,9 @@ fun SectionFlowBar(current: AppSection, onSelect: (AppSection) -> Unit, onOpenOv
                                 scope.launch { focus.animateTo(selectedIndex, travel()) }
                             },
                         ) { change, _ ->
-                            val target = (change.position.x / slotPx - 0.5f).coerceIn(0f, (slots - 1).toFloat())
+                            val target =
+                                flowBarDragTarget(change.position.x, slotPx, slots, barRtl)
+                                    .coerceIn(0f, (slots - 1).toFloat())
                             scope.launch { focus.snapTo(target) }
                         }
                     },
