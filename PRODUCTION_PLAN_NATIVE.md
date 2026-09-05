@@ -4045,6 +4045,41 @@ key claimed by rows carrying different `tvg_id`s in the owner's own catalogue). 
 worse than none, so the floor stays at four. Recorded because the next person will have the same
 suspicion.
 
+### MK.39.1 — the guide's names are stored — shipped, not yet device-verified
+
+`AndroidEpgImporter` walked straight past every `<channel>` element. It now reads each one's id and
+first `<display-name>`, counts programmes per channel **as published** (before the `tvg_id` filter
+throws most of them away — that count is what ranks two guide entries claiming the same name), and
+writes `EpgNameKey.uniqueIndex(...)` into `epg_channel_names`.
+
+Written **inside the streaming transaction**, through a new `BulkEpgWriter.Session.writeChannelNames`,
+and cleared in `begin()` alongside `epg_programmes`. The index points AT those rows: clearing it
+anywhere else would leave keys resolving to programmes that no longer exist for the length of a
+refresh, which reads on screen as the guide showing another channel's listing.
+
+Bounded at `CHANNEL_CAP = 60,000` channels — this file's whole promise is a few MB whatever the feed
+size, and a 254k-channel account already OOM'd the shared-core path at 165 MB. Past the cap the index
+stops growing and says so in the log; matching degrades, nothing breaks.
+
+The index is built **after** the walk rather than during it, so it does not depend on `<channel>`
+preceding `<programme>`. The DTD says it does. Real provider files are not always the DTD.
+
+Tests: 14 pinning `EpgNameKey` itself (it arrived from the iOS fork with none on this side, and the
+measurement above leans on it directly), plus 5 on the writer holding what actually matters — that a
+refresh cannot leave the index and the programmes out of step, that a rolled-back refresh leaves
+neither behind, that a refresh REPLACES the index rather than adding to it, and that two guides
+naming the same channel is redundancy rather than a clash.
+
+**Not yet seen against a real guide.** The verification is a single log line —
+`EPG names: N channels in the guide, M unusable, K keys indexed` — against the owner's 3,377-channel
+guide, and the Google TV's wireless debugging needs re-pairing before it can run. Until then the
+count that matters is unmeasured.
+
+**A note on how this shipped.** MK.39.1's code went in as part of `f61cce32`, whose message is
+entirely about MB-418. The recording report arrived mid-slice and took priority; the staged files
+went along with it. Recorded here rather than quietly, because the commit does not say so and a
+future bisect over the EPG importer would otherwise land on a message about a recording race.
+
 ### What the work is
 
 1. **Store the names.** `AndroidEpgImporter` parses `<channel>` blocks already; write
