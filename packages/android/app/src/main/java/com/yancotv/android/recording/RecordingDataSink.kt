@@ -56,6 +56,7 @@ import java.io.OutputStream
 @androidx.annotation.OptIn(UnstableApi::class)
 class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LOGGER) : DataSink {
     private val lock = Any()
+
     private var output: OutputStream? = null
     private var bytesWritten: Long = 0L
 
@@ -89,6 +90,23 @@ class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LO
     // capture-everything behaviour for callers that don't supply one.
     private var expectedUrl: String? = null
     private var capturing: Boolean = true
+
+    // MB-419 — instrumentation, not a fix.
+    //
+    // The gate above reads correctly and its inputs are supplied, and yet the
+    // owner's recordings carry another stream spliced into them (136 and 295
+    // PIDs where a clean channel has 5-8, packet alignment destroyed, PCR
+    // running backwards). A controlled test on a different switching path
+    // showed the gate holding perfectly. So the question is not what the logic
+    // says, it is whether this code runs at all on the path that breaks.
+    //
+    // [opensSeen] is the load-bearing one: if a recording spans a channel
+    // change and ends having seen ONE open, then `DataSink.open` never reached
+    // this sink for the second item, `capturing` stayed at its `true` default,
+    // and the gate was never given a chance. That single number decides
+    // between "the comparison is wrong" and "the comparison never happens".
+    private var opensSeen: Int = 0
+    private var droppedBytes: Long = 0L
 
     /** True while a recording is in progress (between [begin] and [end]). */
     val isActive: Boolean
@@ -168,8 +186,19 @@ class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LO
             }
             output = null
             bytesWritten = 0L
+            // `total`, not `bytesWritten` — the field is reset one line above.
+            // The first version of this line printed "wrote 0 bytes" for a
+            // 239 MB file, which is the same class of mistake the whole
+            // instrumentation exists to catch: a number that reads as a
+            // finding and is an artefact.
+            android.util.Log.i(
+                LOG_TAG,
+                "end: wrote $total bytes, dropped $droppedBytes, saw $opensSeen data-source open(s)",
+            )
             headerSeen = false
             headerBuf = null
+            opensSeen = 0
+            droppedBytes = 0L
             expectedUrl = null
             capturing = true
             return total
@@ -202,8 +231,23 @@ class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LO
      */
     internal fun onOpenUrl(url: String) {
         synchronized(lock) {
-            val expected = expectedUrl ?: return
+            opensSeen++
+            val expected = expectedUrl
+            if (expected == null) {
+                // No recording bound, or a caller that supplied no URL. Capture
+                // stays wherever it was — logged so an unexpected null shows up
+                // rather than looking like a working gate.
+                android.util.Log.i(LOG_TAG, "open#$opensSeen expected=<none> capturing=$capturing url=$url")
+                return
+            }
+            val was = capturing
             capturing = url.substringBefore('?') == expected.substringBefore('?')
+            android.util.Log.i(
+                LOG_TAG,
+                "open#$opensSeen capturing $was -> $capturing" +
+                    "\n    incoming = $url" +
+                    "\n    expected = $expected",
+            )
         }
     }
 
@@ -223,7 +267,10 @@ class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LO
         synchronized(lock) {
             // MB-376 — drop bytes that belong to a channel other than the one
             // being recorded (the user zapped away; [open] flipped this off).
-            if (!capturing) return
+            if (!capturing) {
+                droppedBytes += length.toLong()
+                return
+            }
             val stream = output ?: return
             try {
                 if (headerSeen) {
@@ -374,6 +421,9 @@ class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LO
     }
 
     private companion object {
+        /** MB-419 instrumentation. `adb logcat -s YancoTee`. */
+        private const val LOG_TAG = "YancoTee"
+
         // MB-206 sync constants. 188 = MPEG-TS packet size; 0x47 = sync
         // byte at the start of every aligned packet; PID 0 carries the
         // Program Association Table.
