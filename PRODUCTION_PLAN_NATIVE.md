@@ -4104,6 +4104,113 @@ number replaces the lower bound above.
 | **37.E** | Guide portrait: now/next list instead of the timeline grid. |
 | **37.G** | Device pass: phone portrait + landscape, Fire TV and Google TV byte-compare. |
 
+## MK.40 — recording follows the viewer
+
+**The rule, decided by the owner 2026-09-04 after measuring the current behaviour against an
+on-screen match clock:**
+
+> A recording exists only while its channel is the one being watched. The recorder never opens a
+> stream of its own, and leaving the channel is a decision the viewer makes explicitly, not a
+> silent consequence.
+
+Everything below follows from that one sentence, including three bugs it makes structurally
+impossible rather than merely fixed.
+
+### Why this rule, and not "record anything"
+
+The recorder does not fetch; it **tees** the bytes the player is already pulling (MK.14.8). That is
+what lets recording work at all on a one-connection account — a second HTTP GET to the same
+provider either hangs behind the player's slot or evicts it. The consequence has always been that
+a tee can only capture what is being played, and the app has spent three milestones pretending
+otherwise: a URL gate to stop the wrong channel being written (MB-376), a wall-clock duration that
+disagrees with the file, a REC indicator that stays lit over a capture receiving nothing, and a
+scheduled-recording subsystem that necessarily opens its own connection and therefore cannot work
+on this account at all.
+
+Aligning the feature with the mechanism removes all of it.
+
+### MK.40.1 — capture starts where the viewer is
+
+**Measured by the owner:** pressing Record during a football match produced a file whose first
+frame is roughly **11 seconds after** the moment on screen. Leaving the channel then added about
+**20 seconds** of further content before the file stopped.
+
+Both numbers are the player's load-ahead buffer, and neither is a fault in the recorder. ExoPlayer
+downloads ahead of the playhead, so the bytes crossing the tee at the instant Record is pressed
+belong to a moment the viewer has not reached yet; and when playback ends, the in-flight load
+finishes before the source is released, which is the 20-second tail.
+
+**Fix:** the sink keeps a bounded rolling window of recent bytes at all times, and flushes it into
+the file at `begin`. The recording then starts at the frame the viewer was looking at, which is
+what pressing Record means. Size the window from the player's load-ahead with a hard byte cap;
+`AndroidEpgImporter`'s promise applies here too — this runs on a Fire TV with a ~320 MB heap, so
+the cap is a memory budget, not a nicety, and it belongs beside the other constants with its cost
+stated.
+
+The tail needs no separate work: under MK.40.2 a recording ends deliberately, so there is nothing
+in flight to drain.
+
+### MK.40.2 — leaving the channel is a decision
+
+While a recording is in flight, any navigation that would replace the playing stream — BACK out of
+the player, another channel, a film, an episode — raises a confirmation with two outcomes:
+
+  - **stay** — nothing changes; the navigation is abandoned and the recording continues
+  - **stop and go** — the recording is finalised first, then the navigation proceeds
+
+The safe outcome takes focus, per `ConfirmDangerDialog`'s existing convention — and per MB-420,
+which found that dialog opening with nothing focused at all, so that convention needs to be true
+before this depends on it.
+
+Finalise **before** navigating, not alongside: MB-418 was exactly the failure of letting a stop
+race the thing that tore its scope down.
+
+### MK.40.3 — retire scheduled recording
+
+Recording from the guide cannot work on a one-connection account: it fires when the viewer is
+elsewhere, so it must open its own stream, which is the case the provider refuses. It is removed
+rather than left disabled.
+
+To remove, verified against the tree 2026-09-04:
+
+| | |
+|---|---|
+| `recording/schedule/` | 5 sources + 3 test files, ~1,530 lines |
+| shared | `RecordingScheduleRepository.kt` (406 lines), `RecordingSchedules.sq`, 2 test files |
+| schema | the table, dropped by a new migration — it was created in `3.sqm` and altered by `8.sqm` and `15.sqm` |
+| manifest | `RecordingScheduleReceiver`, the boot receiver, and the exact-alarm permission if nothing else needs it |
+| call sites | `AppModules` (DI), `YancoApp`, `RecordingService`, `GuideScreen` (the entry point), `RecordingsScreen` (the schedules section) |
+
+**And the fresh-GET recorder goes with it.** `RecordingService.start` has exactly two callers: the
+player's Record button and the schedule receiver. There is no catch-up recording. With the
+schedule gone, `handleStartFreshGet`, `RecordingRouting` and the standalone recorders they drive
+have no reachable caller — `UnreferencedComposableTest`'s sibling problem, one layer down. Confirm
+with a reference check rather than by reading, and delete what nothing calls.
+
+### MK.40.4 — what the rule deletes by existing
+
+These stop being possible states rather than being fixed, and their machinery goes:
+
+  - **MB-419** — another channel's bytes cannot reach the file, because there is no other channel
+    while a recording runs. The URL gate (MB-376) and its instrumentation are then dead weight.
+  - **the duration lie** — `duration_seconds` is wall-clock, and it disagreed with the file only
+    because capture could pause. With capture continuous for the recording's whole life the two
+    agree again; keep the wall-clock computation and add a test that pins them together.
+  - **the silent pause** — the REC indicator can no longer be lit over a capture that is receiving
+    nothing.
+
+### Not in scope
+
+EPG **reminders** are a separate feature and stay. Only recording-from-guide is removed.
+
+### Order of work
+
+1. **MK.40.3 first.** Deleting the subsystem shrinks every surface the rest touches, and it is the
+   change with no design questions left in it.
+2. **MK.40.2** next — the rule is not real until leaving is guarded, and it is what makes 40.4 true.
+3. **MK.40.1** last. It is the only piece with a measurement to hit and a memory budget to defend,
+   and it is easiest to verify against a clock on screen once the rest is settled.
+
 ## Timeline
 
 **Removed by user decision 2026-04-25.** Work proceeds at user's pace — sessions resume when user is rested. The 5-stage roadmap at the top of this file replaces week-based estimates. Historical estimates from before 2026-04-25 are preserved in git history if a back-reference is ever needed.
