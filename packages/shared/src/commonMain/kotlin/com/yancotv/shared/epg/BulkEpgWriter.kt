@@ -171,6 +171,12 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
             beginThread = currentThreadName()
             try {
                 driver.execute(null, "DELETE FROM epg_programmes", 0)
+                // MK.39.1 — the name index points AT these rows, so it is
+                // cleared in the same breath. Clearing it anywhere else would
+                // leave keys resolving to programmes that no longer exist for
+                // the length of a refresh, which reads to the viewer as the
+                // guide showing another channel's listing.
+                driver.execute(null, "DELETE FROM epg_channel_names", 0)
                 open = true
             } catch (t: Throwable) {
                 runCatching { rollbackTraced(driver, logger, "epg.begin") }
@@ -226,6 +232,36 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
                 i = end
             }
         }
+
+        /**
+         * MK.39.1 — the guide's channel names, keyed for matching.
+         *
+         * Written inside the streaming transaction rather than after it, so a
+         * refresh that fails leaves neither the programmes nor the index
+         * behind. [index] is the output of [EpgNameKey.uniqueIndex] for ONE
+         * guide: ambiguity is judged inside a file, and the same name in two
+         * guides is redundancy that the read path resolves by preferring the
+         * channel's own provider.
+         */
+        fun writeChannelNames(sourceKey: String, index: Map<String, String>) {
+            if (!open) error("Session not open")
+            if (index.isEmpty()) return
+            for ((nameKey, tvgId) in index) {
+                driver.execute(
+                    null,
+                    "INSERT OR REPLACE INTO epg_channel_names (name_key, source_key, tvg_id) VALUES (?, ?, ?)",
+                    3,
+                ) {
+                    bindString(0, nameKey)
+                    bindString(1, sourceKey)
+                    bindString(2, tvgId)
+                }
+            }
+            namesWritten += index.size
+        }
+
+        var namesWritten: Int = 0
+            private set
 
         fun commit(lastRefreshedMs: Long? = null) {
             if (!open) error("Session not open")

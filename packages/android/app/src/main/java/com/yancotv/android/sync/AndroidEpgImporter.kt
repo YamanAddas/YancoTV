@@ -7,6 +7,7 @@ import com.yancotv.android.locale.LocaleController
 import com.yancotv.android.locale.Numerals
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.epg.BulkEpgWriter
+import com.yancotv.shared.epg.EpgNameKey
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.parsers.XmltvProgramme
@@ -339,6 +340,26 @@ class AndroidEpgImporter(
             parser.setInput(input, null)
 
             val buffer = ArrayList<XmltvProgramme>(FLUSH_EVERY)
+            // MK.39.1 — the guide's own channel names, which this importer
+            // walked straight past until now. They are the raw material for
+            // matching a channel that carries no tvg_id: the provider calls it
+            // `4K: SKY SPORTS F1 ᵁᴴᴰ ³⁸⁴⁰ᴾ` and the guide calls the same
+            // channel `Sky Sports F1` under an opaque id, and only the names
+            // agree.
+            //
+            // Held as (id, name) pairs rather than pre-keyed, because
+            // EpgNameKey.uniqueIndex needs the raw name and the ranking has to
+            // wait for the programme counts below. Bounded by CHANNEL_CAP so
+            // this file's promise — a few MB whatever the feed size — still
+            // holds against a guide that lists every channel on earth.
+            val guideChannels = ArrayList<Pair<String, String?>>(4096)
+            var channelsSeen = 0
+            var channelsDropped = 0
+            // Programmes per channel AS PUBLISHED, counted before the filter
+            // below throws most of them away. uniqueIndex ranks contested
+            // names by this: an empty duplicate entry is of no use to anyone
+            // even when it is the "correct" channel.
+            val programmeCounts = HashMap<String, Int>(4096)
             var eventType = parser.eventType
             var seen = 0
             var keptExact = 0
@@ -346,9 +367,39 @@ class AndroidEpgImporter(
             var lastTick = System.currentTimeMillis()
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
-                if (eventType == XmlPullParser.START_TAG && parser.name == "programme") {
+                if (eventType == XmlPullParser.START_TAG && parser.name == "channel") {
+                    channelsSeen++
+                    val entry = readChannel(parser)
+                    if (entry == null) {
+                        // Nothing to index — no id, or a name that is only
+                        // decoration. Counted so a guide whose names are all
+                        // unusable shows up in the log rather than as a silent
+                        // zero.
+                        channelsDropped++
+                    } else if (guideChannels.size < CHANNEL_CAP) {
+                        guideChannels.add(entry)
+                    } else {
+                        channelsDropped++
+                    }
+                } else if (eventType == XmlPullParser.START_TAG && parser.name == "programme") {
                     seen++
                     val prog = readProgramme(parser)
+                    if (prog != null) {
+                        // Bounded by the same cap as the channel list, for the
+                        // same reason: this map is keyed by every channel id
+                        // the FILE mentions, not every one we keep. Past the
+                        // cap, existing counts keep rising and no new key is
+                        // added — contested names beyond it fall back to
+                        // uniqueIndex's id tie-break, which is stable but
+                        // arbitrary. Ranking degrades; memory does not.
+                        val id = prog.channelId
+                        val prior = programmeCounts[id]
+                        if (prior != null) {
+                            programmeCounts[id] = prior + 1
+                        } else if (programmeCounts.size < CHANNEL_CAP) {
+                            programmeCounts[id] = 1
+                        }
+                    }
                     val accepted: XmltvProgramme? =
                         when {
                             prog == null -> null
@@ -397,7 +448,48 @@ class AndroidEpgImporter(
             logger.info(
                 "EPG parser: scanned $seen, kept $totalKept ($keptExact exact + $keptNormalised normalised), dropped ${seen - totalKept}",
             )
+
+            // MK.39.1 — built after the walk, not during it, so it does not
+            // depend on <channel> preceding <programme>. The DTD says it does;
+            // real provider files are not always the DTD.
+            val index = EpgNameKey.uniqueIndex(guideChannels, programmeCounts)
+            session.writeChannelNames(sourceKey, index)
+            logger.info(
+                "EPG names: $channelsSeen channels in the guide, $channelsDropped unusable, " +
+                    "${index.size} keys indexed for '$sourceKey'",
+            )
         }
+    }
+
+    /**
+     * Parse a single `<channel id="...">` subtree down to its first
+     * `<display-name>`, and advance the parser past the matching END_TAG.
+     *
+     * The FIRST name wins. XMLTV allows several — usually the same channel in
+     * different languages, or a call sign beside a full name — and there is no
+     * signal saying which is canonical. Taking the first is what
+     * `XmltvParser.parseChannels` already does on both ports, and agreeing
+     * with it matters more than any theory about which is better: the desktop
+     * and the TV must key the same channel the same way.
+     *
+     * Returns null when there is no id, or no name worth a key. A `<channel>`
+     * with no usable name is not an error — plenty of guides carry stubs.
+     */
+    private fun readChannel(parser: XmlPullParser): Pair<String, String?>? {
+        val id = parser.getAttributeValue(null, "id")?.trim().orEmpty()
+        var displayName: String? = null
+        val depth = parser.depth
+        while (true) {
+            val ev = parser.next()
+            if (ev == XmlPullParser.END_DOCUMENT) break
+            if (ev == XmlPullParser.END_TAG && parser.depth == depth && parser.name == "channel") break
+            if (ev == XmlPullParser.START_TAG && parser.name == "display-name" && displayName == null) {
+                displayName = readTextThenEnd(parser)?.trim()?.ifBlank { null }
+            }
+        }
+        if (id.isEmpty()) return null
+        if (displayName == null) return null
+        return id to displayName
     }
 
     /**
@@ -600,6 +692,19 @@ class AndroidEpgImporter(
         private const val USER_AGENT = "YancoTV/0.1 (Android)"
         private const val FLUSH_EVERY = 500
         private const val PROGRESS_TICK_MS = 5_000L
+
+        /**
+         * MK.39.1 — how many `<channel>` entries the name index will hold.
+         *
+         * The owner's guide lists 3,377; a provider EPG covering every channel
+         * on earth can list tens of thousands. At roughly 90 bytes an entry
+         * this cap is a few MB, which is the budget this whole file exists to
+         * respect — a 254k-channel account already OOM'd the shared-core path
+         * at 165 MB. Beyond the cap the index simply stops growing: matching
+         * degrades, nothing breaks, and the shortfall is logged rather than
+         * discovered later as "some channels have a guide and some do not".
+         */
+        private const val CHANNEL_CAP = 60_000
 
         // MK.24.I.7 / MB-230 — replaced the per-class private OkHttpClient
         // with a `newBuilder()` from the Koin-provided shared instance

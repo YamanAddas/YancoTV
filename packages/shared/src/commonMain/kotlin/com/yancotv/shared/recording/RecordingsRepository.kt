@@ -204,34 +204,61 @@ class RecordingsRepository(
         val orphans =
             getByStatus(RecordingStatus.RECORDING)
                 .filter { now - it.startedAt >= orphanThresholdMs }
-        orphans.forEach { entry ->
-            val recoveredBytes = fileBytesIfExists?.invoke(entry.filePath)
-            if (recoveredBytes != null && recoveredBytes >= MIN_RECOVERED_BYTES) {
-                // Process died between handleStop's cancelAndJoin and
-                // markCompleted — recorder finished writing to disk
-                // but the status flip never landed. Salvage as
-                // COMPLETED so the user can play the recording.
-                val secs = ((now - entry.startedAt) / 1000L).coerceAtLeast(0L)
-                db.recordingsQueries.updateStatus(
-                    status = RecordingStatus.COMPLETED.sql,
-                    ended_at = now,
-                    duration_seconds = secs,
-                    file_size_bytes = recoveredBytes,
-                    error = null,
-                    id = entry.id,
-                )
-            } else {
-                db.recordingsQueries.updateStatus(
-                    status = RecordingStatus.FAILED.sql,
-                    ended_at = now,
-                    duration_seconds = entry.durationSeconds,
-                    file_size_bytes = entry.fileSizeBytes,
-                    error = "orphaned_by_app_kill",
-                    id = entry.id,
-                )
-            }
-        }
+        orphans.forEach { salvageEntry(it, now) }
         return orphans.size
+    }
+
+    /**
+     * MB-418 — close ONE stranded row, by the same rule as [sweepOrphans].
+     *
+     * The service needs this when a stop arrives for a recording it has no job
+     * for: the row says RECORDING, nothing is writing to it, and the viewer is
+     * pressing a Stop button that could never do anything. Before this, that
+     * press returned in silence and the row waited for the next launch's
+     * sweep.
+     *
+     * Extracted rather than re-implemented in the service. The decision — does
+     * the file on disk hold enough to be worth keeping — is the load-bearing
+     * part, and a second copy of it would be free to drift from the one the
+     * boot path uses. Same reason the byte floor lives in one place.
+     *
+     * @return true when a row was actually closed; false when there is no such
+     *   row, or it had already reached a terminal state, which is an ordinary
+     *   race and not an error.
+     */
+    fun salvage(id: String): Boolean {
+        val entry = getById(id) ?: return false
+        if (entry.status != RecordingStatus.RECORDING) return false
+        salvageEntry(entry, clock())
+        return true
+    }
+
+    private fun salvageEntry(entry: RecordingEntry, now: Long) {
+        val recoveredBytes = fileBytesIfExists?.invoke(entry.filePath)
+        if (recoveredBytes != null && recoveredBytes >= MIN_RECOVERED_BYTES) {
+            // Process died between handleStop's cancelAndJoin and
+            // markCompleted — recorder finished writing to disk
+            // but the status flip never landed. Salvage as
+            // COMPLETED so the user can play the recording.
+            val secs = ((now - entry.startedAt) / 1000L).coerceAtLeast(0L)
+            db.recordingsQueries.updateStatus(
+                status = RecordingStatus.COMPLETED.sql,
+                ended_at = now,
+                duration_seconds = secs,
+                file_size_bytes = recoveredBytes,
+                error = null,
+                id = entry.id,
+            )
+        } else {
+            db.recordingsQueries.updateStatus(
+                status = RecordingStatus.FAILED.sql,
+                ended_at = now,
+                duration_seconds = entry.durationSeconds,
+                file_size_bytes = entry.fileSizeBytes,
+                error = "orphaned_by_app_kill",
+                id = entry.id,
+            )
+        }
     }
 
     // ── internal ──────────────────────────────────────────────────

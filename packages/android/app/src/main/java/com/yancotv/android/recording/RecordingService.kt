@@ -27,6 +27,7 @@ import com.yancotv.shared.recording.RecordResult
 import com.yancotv.shared.recording.RecorderClock
 import com.yancotv.shared.recording.RecordingFormat
 import com.yancotv.shared.recording.RecordingScheduleRepository
+import com.yancotv.shared.recording.RecordingStatus
 import com.yancotv.shared.recording.RecordingsRepository
 import com.yancotv.shared.recording.scheduleOutcomeFromBytes
 import java.util.UUID
@@ -91,6 +92,25 @@ class RecordingService : Service() {
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
+     * MB-418 — stops that have left [activeJobs] but have not finished writing
+     * their outcome.
+     *
+     * [handleStop] removes the job from the map SYNCHRONOUSLY and then does
+     * the work — flush, read the byte count, transition the row — in a
+     * coroutine. Between those two the map is empty, and cancelling the job
+     * makes the recorder deliver its result, which ends at [maybeStop]. That
+     * saw an empty map, called `stopSelf()`, and `onDestroy` cancelled
+     * [serviceScope] out from under the transition that was still running.
+     *
+     * The row therefore stayed RECORDING for ever: the UI kept offering
+     * "Stop recording", every later stop hit `activeJobs[id] ?: return` and
+     * did nothing, and the next launch's orphan sweep marked it
+     * `FAILED("orphaned_by_app_kill")` — which reads to the viewer as the
+     * recording having been deleted.
+     */
+    private val finalising = java.util.concurrent.atomic.AtomicInteger(0)
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val activeOutputs = ConcurrentHashMap<String, RecordingOutput>()
     private val notificationLock = Mutex()
@@ -423,7 +443,17 @@ class RecordingService : Service() {
     }
 
     private fun handleStop(recordId: String, userInitiated: Boolean = false) {
-        val job = activeJobs[recordId] ?: return
+        val job = activeJobs[recordId]
+        if (job == null) {
+            // MB-418 — this used to `return` in silence, which is what made
+            // the bug unreportable: the user pressed Stop, nothing happened,
+            // and the log said nothing either. It is also recoverable. A row
+            // that still reads RECORDING with no job behind it is stranded,
+            // and the honest thing is to close it here rather than leave the
+            // viewer pressing a button that can never work.
+            reconcileStranded(recordId)
+            return
+        }
         val output = activeOutputs[recordId]
         // Pull bookkeeping off the maps up front so a duplicate ACTION_STOP
         // arriving while we're awaiting the flush doesn't double-cancel.
@@ -435,105 +465,155 @@ class RecordingService : Service() {
         // via `recordingSink.end()` in the awaitCancellation block. The
         // flush is asynchronous from `job.cancel()`, so we cancelAndJoin
         // before reading `output.size()` to avoid racing a stale byte count.
+        // Counted BEFORE the launch: `maybeStop` can be reached from the
+        // recorder's own result path the moment the job is cancelled below,
+        // which is inside this coroutine and therefore too late.
+        finalising.incrementAndGet()
         serviceScope.launch(Dispatchers.IO) {
-            runCatching { job.cancelAndJoin() }
-            // MK.14.X audit revision + MB-218 (AutoCloseable) — flip
-            // MediaStore IS_PENDING=0 (or whatever the backend's finalize
-            // step is) AFTER cancelAndJoin returns so the file is fully
-            // flushed when the system marks it visible. No-op for File /
-            // SAF backends. close() is the AutoCloseable surface.
-            runCatching { output?.close() }
-            val bytes = output?.size() ?: 0L
-            runCatching {
-                val startedAt = recordings.getById(recordId)?.startedAt
-                val secs =
-                    startedAt?.let { (System.currentTimeMillis() - it) / 1000L }
-                        ?.coerceAtLeast(0L) ?: 0L
-                when {
-                    userInitiated -> {
-                        // Explicit user Cancel (UI button or
-                        // scheduler.cancel). Mark CANCELLED regardless
-                        // of bytes — a deliberate stop must not flip to
-                        // FAILED just because the recorder hadn't
-                        // received any bytes yet, or to COMPLETED if
-                        // the user wanted to discard the partial.
-                        // Real bytes-on-disk are still written to the
-                        // row's file_size_bytes so the UI can show
-                        // "Cancelled · X MB" accurately and orphan-
-                        // file cleanup has a non-zero count to work
-                        // with.
-                        Log.i(TAG, "stop[$recordId] cancelled by user — $bytes bytes (${secs}s)")
-                        recordings.markCancelled(id = recordId, bytesWritten = bytes)
+            try {
+                runCatching { job.cancelAndJoin() }
+                // MK.14.X audit revision + MB-218 (AutoCloseable) — flip
+                // MediaStore IS_PENDING=0 (or whatever the backend's finalize
+                // step is) AFTER cancelAndJoin returns so the file is fully
+                // flushed when the system marks it visible. No-op for File /
+                // SAF backends. close() is the AutoCloseable surface.
+                runCatching { output?.close() }
+                val bytes = output?.size() ?: 0L
+                runCatching {
+                    val startedAt = recordings.getById(recordId)?.startedAt
+                    val secs =
+                        startedAt?.let { (System.currentTimeMillis() - it) / 1000L }
+                            ?.coerceAtLeast(0L) ?: 0L
+                    when {
+                        userInitiated -> {
+                            // Explicit user Cancel (UI button or
+                            // scheduler.cancel). Mark CANCELLED regardless
+                            // of bytes — a deliberate stop must not flip to
+                            // FAILED just because the recorder hadn't
+                            // received any bytes yet, or to COMPLETED if
+                            // the user wanted to discard the partial.
+                            // Real bytes-on-disk are still written to the
+                            // row's file_size_bytes so the UI can show
+                            // "Cancelled · X MB" accurately and orphan-
+                            // file cleanup has a non-zero count to work
+                            // with.
+                            Log.i(TAG, "stop[$recordId] cancelled by user — $bytes bytes (${secs}s)")
+                            recordings.markCancelled(id = recordId, bytesWritten = bytes)
+                        }
+                        bytes <= 0L -> {
+                            // End-alarm / natural-finish path with no
+                            // bytes — the server never started serving the
+                            // request body. Mark FAILED so the row reads
+                            // "Failed · no_response_from_server" instead
+                            // of "Saved 0 KB" (which would invite the
+                            // user to tap Play and hit the 3003
+                            // unrecognized-input error).
+                            Log.i(TAG, "stop[$recordId] failed — no bytes from server")
+                            recordings.markFailed(
+                                id = recordId,
+                                reason = "no_response_from_server",
+                                bytesWritten = 0L,
+                            )
+                        }
+                        else -> {
+                            Log.i(TAG, "stop[$recordId] saved $bytes bytes (${secs}s)")
+                            recordings.markCompleted(
+                                id = recordId,
+                                bytesWritten = bytes,
+                                durationSeconds = secs,
+                            )
+                        }
                     }
-                    bytes <= 0L -> {
-                        // End-alarm / natural-finish path with no
-                        // bytes — the server never started serving the
-                        // request body. Mark FAILED so the row reads
-                        // "Failed · no_response_from_server" instead
-                        // of "Saved 0 KB" (which would invite the
-                        // user to tap Play and hit the 3003
-                        // unrecognized-input error).
-                        Log.i(TAG, "stop[$recordId] failed — no bytes from server")
-                        recordings.markFailed(
-                            id = recordId,
-                            reason = "no_response_from_server",
-                            bytesWritten = 0L,
-                        )
-                    }
-                    else -> {
-                        Log.i(TAG, "stop[$recordId] saved $bytes bytes (${secs}s)")
-                        recordings.markCompleted(
-                            id = recordId,
-                            bytesWritten = bytes,
-                            durationSeconds = secs,
-                        )
-                    }
-                }
-            }.onFailure { Log.w(TAG, "stop[$recordId] transition failed", it) }
+                }.onFailure { Log.w(TAG, "stop[$recordId] transition failed", it) }
 
-            // MB-212 — schedule transition lives HERE (post-flush) so
-            // the schedule's terminal state agrees with the recording
-            // row's bytes count. Pre-fix the receiver made this call
-            // BEFORE the async flush completed; in a sub-100ms window
-            // the schedule could lock FAILED while the row eventually
-            // transitioned to COMPLETED.
-            //
-            // scheduleId is derived from the recordId via the
-            // deterministic prefix (`sched-rec-<id>`) so we don't have
-            // to plumb it through RecordInput / Intent extras / the
-            // activeJobs map. Manual record-now recordings have no
-            // prefix → null → we skip the schedule call entirely.
-            //
-            // Race-tolerance: if the schedule is already terminal
-            // (user cancelled, or receiver-fallback transitioned a
-            // row-missing case to FAILED earlier in this handleEnd
-            // call), `transitionTo` throws IllegalArgumentException
-            // and runCatching swallows. MB-214 pins this exact
-            // behaviour at the repo layer.
-            RecordingScheduleScheduler.scheduleIdFromRecordId(recordId)?.let { schedId ->
-                if (userInitiated) {
-                    // Schedule was pre-claimed CANCELLED by
-                    // RecordingScheduleScheduler.cancel() before this
-                    // ACTION_STOP was dispatched. scheduleOutcomeFromBytes
-                    // would compute FAILED/COMPLETED here, but transitionTo
-                    // on a CANCELLED (terminal) row would be rejected by
-                    // the repo guard and runCatching would swallow it.
-                    // Skip the call entirely — keeps the debug log clean.
-                    Log.d(TAG, "schedule[$schedId] terminal transition skipped (user-cancelled)")
-                } else {
-                    val outcome = scheduleOutcomeFromBytes(bytes)
-                    runCatching {
-                        schedules.transitionTo(schedId, outcome.state, errorReason = outcome.reason)
-                    }.onFailure {
-                        Log.d(
-                            TAG,
-                            "schedule[$schedId] transition rejected — likely already terminal: ${it.message}",
-                        )
+                // MB-212 — schedule transition lives HERE (post-flush) so
+                // the schedule's terminal state agrees with the recording
+                // row's bytes count. Pre-fix the receiver made this call
+                // BEFORE the async flush completed; in a sub-100ms window
+                // the schedule could lock FAILED while the row eventually
+                // transitioned to COMPLETED.
+                //
+                // scheduleId is derived from the recordId via the
+                // deterministic prefix (`sched-rec-<id>`) so we don't have
+                // to plumb it through RecordInput / Intent extras / the
+                // activeJobs map. Manual record-now recordings have no
+                // prefix → null → we skip the schedule call entirely.
+                //
+                // Race-tolerance: if the schedule is already terminal
+                // (user cancelled, or receiver-fallback transitioned a
+                // row-missing case to FAILED earlier in this handleEnd
+                // call), `transitionTo` throws IllegalArgumentException
+                // and runCatching swallows. MB-214 pins this exact
+                // behaviour at the repo layer.
+                RecordingScheduleScheduler.scheduleIdFromRecordId(recordId)?.let { schedId ->
+                    if (userInitiated) {
+                        // Schedule was pre-claimed CANCELLED by
+                        // RecordingScheduleScheduler.cancel() before this
+                        // ACTION_STOP was dispatched. scheduleOutcomeFromBytes
+                        // would compute FAILED/COMPLETED here, but transitionTo
+                        // on a CANCELLED (terminal) row would be rejected by
+                        // the repo guard and runCatching would swallow it.
+                        // Skip the call entirely — keeps the debug log clean.
+                        Log.d(TAG, "schedule[$schedId] terminal transition skipped (user-cancelled)")
+                    } else {
+                        val outcome = scheduleOutcomeFromBytes(bytes)
+                        runCatching {
+                            schedules.transitionTo(schedId, outcome.state, errorReason = outcome.reason)
+                        }.onFailure {
+                            Log.d(
+                                TAG,
+                                "schedule[$schedId] transition rejected — likely already terminal: ${it.message}",
+                            )
+                        }
                     }
                 }
+            } finally {
+                finalising.decrementAndGet()
             }
-
             refreshNotification()
+            maybeStop()
+        }
+    }
+
+    /**
+     * MB-418 — close a row that says RECORDING with nothing behind it.
+     *
+     * Reached when a stop arrives for an id [activeJobs] does not know: the
+     * service was restarted, the process was killed, or an earlier stop was
+     * cut short. Marked CANCELLED rather than FAILED because the user is
+     * pressing Stop — a deliberate stop should not read as a fault — and with
+     * whatever bytes the file actually holds, so the row and the disk agree.
+     *
+     * A row that is already terminal is left alone; the repo guard rejects the
+     * transition and that is the correct outcome, not an error.
+     */
+    private fun reconcileStranded(recordId: String) {
+        finalising.incrementAndGet()
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                val row = recordings.getById(recordId)
+                if (row == null) {
+                    Log.w(TAG, "stop[$recordId] no job and no row — nothing to close")
+                    return@launch
+                }
+                if (row.status != RecordingStatus.RECORDING) {
+                    Log.i(TAG, "stop[$recordId] already ${row.status} — nothing to do")
+                    return@launch
+                }
+                Log.w(
+                    TAG,
+                    "stop[$recordId] row says RECORDING but no job is running — salvaging",
+                )
+                // Same rule the boot sweep uses, not a second copy of it: the
+                // file is probed, and a real capture lands COMPLETED rather
+                // than being written off. Inventing a zero byte count here
+                // would have turned a recoverable recording into a lie the
+                // viewer can see.
+                runCatching { recordings.salvage(recordId) }
+                    .onFailure { Log.w(TAG, "stop[$recordId] salvage failed", it) }
+            } finally {
+                finalising.decrementAndGet()
+            }
             maybeStop()
         }
     }
@@ -581,7 +661,7 @@ class RecordingService : Service() {
     }
 
     private fun maybeStop() {
-        if (activeJobs.isEmpty()) {
+        if (canStopService(activeJobs.size, finalising.get())) {
             // MB-209 / MB-210 hardening — release locks now that no
             // recording remains. isHeld guards so we don't fault when
             // no acquire ever ran (fresh service whose first intent
