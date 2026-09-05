@@ -4178,14 +4178,15 @@ To remove, verified against the tree 2026-09-04:
 | `recording/schedule/` | 5 sources + 3 test files, ~1,530 lines |
 | shared | `RecordingScheduleRepository.kt` (406 lines), `RecordingSchedules.sq`, 2 test files |
 | schema | the table, dropped by a new migration — it was created in `3.sqm` and altered by `8.sqm` and `15.sqm` |
-| manifest | `RecordingScheduleReceiver`, the boot receiver, and the exact-alarm permission if nothing else needs it |
+| manifest | `RecordingScheduleReceiver` and the boot receiver. **The exact-alarm permissions stay** — reminders need them (see the red team below) |
 | call sites | `AppModules` (DI), `YancoApp`, `RecordingService`, `GuideScreen` (the entry point), `RecordingsScreen` (the schedules section) |
 
 **And the fresh-GET recorder goes with it.** `RecordingService.start` has exactly two callers: the
 player's Record button and the schedule receiver. There is no catch-up recording. With the
 schedule gone, `handleStartFreshGet`, `RecordingRouting` and the standalone recorders they drive
-have no reachable caller — `UnreferencedComposableTest`'s sibling problem, one layer down. Confirm
-with a reference check rather than by reading, and delete what nothing calls.
+have no reachable caller on Android — `UnreferencedComposableTest`'s sibling problem, one layer
+down. Confirm with a reference check rather than by reading. **The shared recorders themselves stay**
+for the reason set out in the red team below.
 
 ### MK.40.4 — what the rule deletes by existing
 
@@ -4198,6 +4199,41 @@ These stop being possible states rather than being fixed, and their machinery go
     agree again; keep the wall-clock computation and add a test that pins them together.
   - **the silent pause** — the REC indicator can no longer be lit over a capture that is receiving
     nothing.
+
+### Red team, before anything is deleted
+
+Three entanglements the deletion would otherwise have broken. Found by looking for them on
+purpose, 2026-09-04, at the owner's instruction.
+
+**1. Backups carry schedules, and the field is not optional.** `BackupFileV1` declares
+`recordingSchedules: List<RecordingScheduleRecord>` as a required property; `BackupExporter` writes
+it and `BackupImporter` reads it. Deleting the property would make **every backup file already on
+disk fail to parse** — kotlinx.serialization throws on a missing required field — and those files
+are the owner's only copy of their sources and credentials. This is the highest-risk item in the
+whole milestone and it is not about recording at all.
+
+Required approach: **keep the property in the format**, give it `= emptyList()` so new files
+without it still load, stop populating it on export, and have the importer accept and ignore it. A
+backup written before this milestone must still restore afterwards, and a test has to say so — the
+existing round-trip test is the right place, extended with a fixture from the old format.
+
+**2. The exact-alarm permissions belong to reminders, not to recording.** The manifest's own
+comment says so: *"Programme reminders need exact-alarm scheduling."* `USE_EXACT_ALARM` and
+`SCHEDULE_EXACT_ALARM` stay. Only `RecordingScheduleReceiver` and its boot receiver come out. The
+earlier draft of this plan said "the exact-alarm permission if nothing else needs it" — something
+does.
+
+**3. `MpegTsRecorder` and `HlsRecorder` live in `packages/shared`, and iOS shares that module.**
+They are the fresh-GET recorders, Android reaches them only through `handleStartFreshGet`, and they
+carry their own tests. It does not follow that they are dead: `packages/shared` serves two apps and
+the iOS one is a separate repository this tree cannot read. Deleting them here to tidy Android
+could remove the iOS app's recording engine.
+
+So the boundary is: **remove Android's fresh-GET path** — `handleStartFreshGet`, `RecordingRouting`
+and the branch in `handleStart` — and **leave the shared recorders and their tests where they
+are.** If they are genuinely unused on both sides, that is the iOS repository's call to make with
+its own tree in front of it. AGENTS.md's rule that the two ports may differ cuts this way too: one
+port having no use for a shared class is not evidence the other does not.
 
 ### Not in scope
 
