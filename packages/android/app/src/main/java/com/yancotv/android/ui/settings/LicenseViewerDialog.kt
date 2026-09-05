@@ -18,8 +18,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -31,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import kotlinx.coroutines.launch
 
@@ -63,7 +63,10 @@ fun LicenseViewerDialog(title: String, @RawRes textRes: Int, onDismiss: () -> Un
     }
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
-    val focus = remember { FocusRequester() }
+    // MB-420 — was a bare requester driven from LaunchedEffect, which asks
+    // before the dialog's window has placed anything and silently fails. A
+    // licence dialog that opens unfocused cannot be dismissed with a remote.
+    val focusAnchor = rememberPlacedFocusAnchor()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -89,7 +92,7 @@ fun LicenseViewerDialog(title: String, @RawRes textRes: Int, onDismiss: () -> Un
                 Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .focusRequester(focus)
+                    .placedFocus(focusAnchor)
                     .focusable()
                     .onPreviewKeyEvent { event ->
                         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -118,5 +121,5 @@ fun LicenseViewerDialog(title: String, @RawRes textRes: Int, onDismiss: () -> Un
             }
         }
     }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    LaunchedEffect(Unit) { focusAnchor.awaitAndRequest() }
 }

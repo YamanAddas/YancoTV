@@ -33,8 +33,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -46,6 +44,8 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
@@ -244,8 +244,10 @@ private fun SurfRow(
     val border = if (focused) LocalYancoPalette.current.FocusRing else Color.Transparent
     val title = item.displayTitle
 
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(autoFocus) { if (autoFocus) runCatching { focusRequester.requestFocus() } }
+    // MB-420 — same race as the confirmation dialog: the request fires on
+    // the first composition, before the row it names is placed.
+    val focusAnchor = rememberPlacedFocusAnchor()
+    LaunchedEffect(autoFocus) { if (autoFocus) focusAnchor.awaitAndRequest() }
 
     Row(
         modifier =
@@ -255,7 +257,7 @@ private fun SurfRow(
             .clip(RoundedCornerShape(6.dp))
             .background(bg)
             .border(1.dp, border, RoundedCornerShape(6.dp))
-            .focusRequester(focusRequester)
+            .placedFocus(focusAnchor)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
             .padding(horizontal = 10.dp),

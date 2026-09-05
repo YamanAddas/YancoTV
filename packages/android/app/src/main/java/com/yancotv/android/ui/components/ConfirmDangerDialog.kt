@@ -2,16 +2,17 @@ package com.yancotv.android.ui.components
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import com.yancotv.android.R
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import kotlinx.coroutines.flow.first
 
 /**
  * MB-335 — confirmation gate for destructive one-press actions.
@@ -41,30 +42,64 @@ import com.yancotv.android.ui.theme.LocalYancoPalette
 @Composable
 fun ConfirmDangerDialog(title: String, body: String, confirmLabel: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val palette = LocalYancoPalette.current
-    val cancelFocus = remember { FocusRequester() }
+    // MB-420 — this used to be a bare FocusRequester driven by
+    // `LaunchedEffect(Unit) { runCatching { requestFocus() } }`. On a
+    // television that never landed: the effect runs on the first composition,
+    // the dialog's own window has not placed the button yet, the request
+    // fails, and `runCatching` swallows it. Measured on the Google TV — the
+    // dialog rendered with 2 focusable nodes and 0 focused, and a CENTER press
+    // did nothing at all.
+    //
+    // That is the failure the owner reported as "one recording deleted, the
+    // rest would not": whether a confirmation could be confirmed depended on
+    // whether the viewer happened to press an arrow key first, which moves
+    // focus in and makes the dialog work from then on.
+    //
+    // `PlacedFocusAnchor` is the primitive the native-android-mk checklist
+    // prescribes for exactly this, and says why: it waits for `onPlaced`
+    // before requesting, where the delay-ladder pattern is a race that has
+    // silently failed in production more than once.
+    val cancelAnchor = rememberPlacedFocusAnchor()
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.BackgroundRaised,
         title = { Text(title, color = palette.TextPrimary) },
         text = { Text(body, color = palette.TextSecondary) },
+        // MB-420 — Material3 `TextButton`s, and two attempts to make a focus
+        // request land on one of them failed on the television: the dialog
+        // still opened with 2 focusable nodes and 0 focused. MB-395 already
+        // moved every other destructive control in the app off Material3 for
+        // exactly this reason, and the checklist states it as a rule — TV
+        // focus targets do not use Material3 clickables. This dialog was the
+        // one that never got the memo, which is why it is the one that could
+        // not be confirmed with a remote.
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(confirmLabel, color = palette.Error)
+            YancoDangerButton(onClick = onConfirm, size = ButtonSize.Compact) {
+                Text(confirmLabel, color = palette.TextPrimary)
             }
         },
         dismissButton = {
-            TextButton(
+            YancoSecondaryButton(
                 onClick = onDismiss,
-                modifier = Modifier.focusRequester(cancelFocus),
+                modifier = Modifier.placedFocus(cancelAnchor),
+                size = ButtonSize.Compact,
             ) {
                 Text(stringResource(R.string.common_cancel), color = palette.TextPrimary)
             }
         },
     )
+    // MB-420 — placement is necessary and NOT sufficient. Waiting for
+    // `onPlaced` alone still left the dialog with 2 focusable nodes and 0
+    // focused, measured on the Google TV after the first attempt at this fix.
+    // An AlertDialog renders in its OWN window, and a focus request aimed at a
+    // node in a window that has not yet taken focus is dropped. So wait for
+    // both: the node to exist, and the window to be the one receiving input.
+    val windowInfo = LocalWindowInfo.current
     LaunchedEffect(Unit) {
-        // The dialog's window may not have placed the button on the first
-        // frame; a failed request here must not crash the dialog that is
-        // guarding a deletion.
-        runCatching { cancelFocus.requestFocus() }
+        snapshotFlow { windowInfo.isWindowFocused }.first { it }
+        // Cancel keeps the focus rather than the destructive action: a stray
+        // second CENTER — the double-press this dialog exists to absorb — must
+        // dismiss, not confirm.
+        cancelAnchor.awaitAndRequest()
     }
 }
