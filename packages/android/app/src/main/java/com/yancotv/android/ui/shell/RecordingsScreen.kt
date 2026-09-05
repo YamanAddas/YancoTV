@@ -34,12 +34,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.documentfile.provider.DocumentFile
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.recording.RecordingService
+import com.yancotv.android.recording.deleteRecordingFile
 import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.ui.components.ButtonSize
 import com.yancotv.android.ui.components.ConfirmDangerDialog
@@ -705,14 +705,22 @@ private fun playRecording(controller: PlaybackController, context: Context, entr
  */
 private suspend fun deleteRecording(context: Context, recordings: RecordingsRepository, entry: RecordingEntry) {
     withContext(Dispatchers.IO) {
-        runCatching {
-            if (entry.filePath.startsWith("content://")) {
-                val uri = Uri.parse(entry.filePath)
-                DocumentFile.fromSingleUri(context, uri)?.delete()
-            } else {
-                File(entry.filePath).delete()
-            }
+        // MB-421 — this used to decide here, and decide wrongly: every
+        // `content://` went to DocumentFile, which is the SAF surface, while
+        // recordings live in MediaStore. The provider threw, the throw was
+        // swallowed, and the row was deleted anyway — so a delete always
+        // looked clean and always left its file. `deleteRecordingFile` is the
+        // one rule, next to the storage backends that already knew it.
+        val removed = deleteRecordingFile(context, entry.filePath)
+        if (!removed) {
+            android.util.Log.w(
+                "Yanco",
+                "recording ${entry.id}: file not removed (${entry.filePath}) — deleting the row anyway",
+            )
         }
+        // The row goes either way. A row pointing at a file that could not be
+        // deleted is worse than an orphaned file: the user cannot get rid of
+        // it, and Play would open onto nothing.
         runCatching { recordings.deleteById(entry.id) }
     }
 }

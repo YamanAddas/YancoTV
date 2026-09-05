@@ -421,3 +421,76 @@ internal class RecordingStorageResolver(private val context: Context, private va
         private const val TAG = "YancoStorageResolver"
     }
 }
+
+/**
+ * MB-421 — how a recording's stored `file_path` is deleted.
+ *
+ * ### What went wrong
+ *
+ * `RecordingsScreen.deleteRecording` decided by looking at the string: anything
+ * starting `content://` went to `DocumentFile.fromSingleUri(...).delete()`.
+ * That is the **Storage Access Framework** surface, and recordings are
+ * allocated through **MediaStore**, whose provider rejects it outright:
+ *
+ * ```
+ * UnsupportedOperationException: Unsupported call: android:deleteDocument
+ * DocumentsContract: Failed to delete document
+ * ```
+ *
+ * The call sat in its own `runCatching` with no `onFailure`, so the throw was
+ * swallowed and the row was deleted regardless by the next one. Every delete
+ * therefore looked clean and left its file behind. Measured on the owner's
+ * television, 2026-09-04: **0 rows in the list, 9 files on disk, 238 MB**, with
+ * the oldest orphan dating from April — and the device eventually reached 100%
+ * full, at which point recording stopped working with no message.
+ *
+ * ### Why this lives here
+ *
+ * [MediaStoreRecordingOutput.delete] already gets this right, and so do the
+ * File and SAF backends. The screen was re-deciding at the call site what this
+ * file already knows, which is the same "one rule, two copies" shape as
+ * MB-418's salvage. [recordingPathKind] is the decision on its own so a test
+ * can hold it without a device.
+ */
+enum class RecordingPathKind {
+    /** `content://media/...` — delete through the ContentResolver. */
+    MEDIA_STORE,
+
+    /** Any other `content://` — a SAF document the user picked. */
+    SAF_DOCUMENT,
+
+    /** An absolute filesystem path. */
+    FILE,
+}
+
+/**
+ * Classify a stored `file_path`.
+ *
+ * The MediaStore test is on the URI's **authority**, not on a prefix of the
+ * whole string: `content://media/external_primary/video/media/1000000066` and
+ * `content://media/external/video/media/42` are both MediaStore and differ
+ * after the authority.
+ */
+fun recordingPathKind(filePath: String): RecordingPathKind = when {
+    !filePath.startsWith("content://") -> RecordingPathKind.FILE
+    filePath.removePrefix("content://").substringBefore('/') == "media" -> RecordingPathKind.MEDIA_STORE
+    else -> RecordingPathKind.SAF_DOCUMENT
+}
+
+/**
+ * Delete the file behind a recording row. Returns false when nothing was
+ * removed — the caller decides whether that is worth telling the user, but it
+ * must not be silent in the log.
+ */
+fun deleteRecordingFile(context: Context, filePath: String): Boolean = runCatching {
+    when (recordingPathKind(filePath)) {
+        RecordingPathKind.MEDIA_STORE ->
+            context.contentResolver.delete(Uri.parse(filePath), null, null) > 0
+        RecordingPathKind.SAF_DOCUMENT ->
+            DocumentFile.fromSingleUri(context, Uri.parse(filePath))?.delete() == true
+        RecordingPathKind.FILE ->
+            java.io.File(filePath).delete()
+    }
+}.onFailure {
+    android.util.Log.w("YancoRecordingSvc", "delete failed for $filePath", it)
+}.getOrDefault(false)
